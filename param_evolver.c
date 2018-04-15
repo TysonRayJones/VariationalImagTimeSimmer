@@ -12,8 +12,9 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_blas.h>
+#include <gsl/gsl_multifit.h>
 
-#include "../QuEST/qubits.h"
+#include "QuEST/qubits.h"
 
 
 /** size of the change in parameter when approxing wavefunction derivatives */
@@ -22,9 +23,12 @@ double DERIV_STEP_SIZE = 1.0/1000000.0;
 /** greatest change in parameter allowed in a single evolve step before flagged */
 double MAX_PARAM_CHANGE = 1.572; // approx pi/2
 
+/** when approx'ing ill-posed param change by TSVD, truncate SVs smaller than below*max */
+double DEFAULT_SVD_TOLERANCE = 0.001;
+
 
 /**
- * Returns the number of parameters needed to repeat the default ancilla circuit
+ * Returns the number of parameters needed to repeat the default ansatz circuit
  * numBlocks times, resulting in an equal number of gates (each with an individual parameter)
  * on each qubit
  */
@@ -34,58 +38,15 @@ int chooseDefaultNumParams(MultiQubit qubits, int numBlocks) {
 }
 
 
-/*
-void applyAncillaCircuit(MultiQubit qubits, double* params, int numParams) {
-	
-	double t = params[0];
-	double p = params[1];
-	
-	double norm = sqrt(
-		pow(sin(2*t), 2) + 
-		pow(sin(2*p), 2) +
-		pow(cos(t + 2*p), 2) +
-		pow(sin((t + p)/2), 2)
-	);
-	
-	for (int i=0; i < 4; i++)
-		qubits.stateVec.imag[i] = 0;
-		
-	qubits.stateVec.real[0] = sin((t+p)/2.0)/norm;
-	qubits.stateVec.real[1] = sin(2*p)/norm;
-	qubits.stateVec.real[2] = cos(t + 2*p)/norm;
-	qubits.stateVec.real[3] = sin(2*t)/norm;
-}
-*/
-
-/*
-void applyAncillaCircuit(MultiQubit qubits, double* params, int numParams) {
-	
-	double norm = sqrt(1 + pow(sin(2*params[0]), 2));
-	
-	for (int i=0; i < 4; i++)
-		qubits.stateVec.imag[i] = 0;
-		
-	qubits.stateVec.real[0] = sin(params[0])/norm;
-	qubits.stateVec.real[1] = 0;
-	qubits.stateVec.real[2] = cos(params[0])/norm;
-	qubits.stateVec.real[3] = sin(2*params[0])/norm;
-	
-	double normCheck = 0;
-	for (int j=0; j < 4; j++)
-		normCheck += getProbEl(qubits, j);
-}
-*/
-
-
 /**
- * Applies a default parameterised ancilla circuit to the zero state, modifying
+ * Applies a default parameterised ansatz circuit to the zero state, modifying
  * the wavefunction in qubits according to the values in params. This can be passed
- * to evolveParams in lieu of a custom ancilla circuit
+ * to evolveParams in lieu of a custom ansatz circuit
  */
-void defaultAncillaCircuit(MultiQubit qubits, double* params, int numParams) {
+void defaultAnsatzCircuit(MultiQubit qubits, double* params, int numParams) {
 	
 	initStateZero(&qubits);
-
+	
 	int paramInd = 0;
 	
 	// loop the following circuit until all params are featured
@@ -111,25 +72,25 @@ void defaultAncillaCircuit(MultiQubit qubits, double* params, int numParams) {
 
 /**
  * Gives the derivative (as a 2^N length array of complex doubles) of the
- * wavefunction produced by ancillaCircuit w.r.t a given parameter in the 
+ * wavefunction produced by ansatzircuit w.r.t a given parameter in the 
  * region of the passed parameters, approximated using the first-order 
  * central finite-difference formula. Deriv must be pre allocated, and is
  * modified
  */
 void findDeriv(
 	double complex *deriv, long long int length, 
-	void (*ancillaCircuit)(MultiQubit, double*, int),
+	void (*ansatzCircuit)(MultiQubit, double*, int),
 	MultiQubit qubits, double* params, int numParams, int paramInd
 ) {
 	// psi(p + h/2)
 	params[paramInd] += DERIV_STEP_SIZE/2;
-	ancillaCircuit(qubits, params, numParams);
+	ansatzCircuit(qubits, params, numParams);
 	for (long long int i=0LL; i < length; i++)
 		deriv[i] = getRealAmpEl(qubits, i) + I*getImagAmpEl(qubits, i);
 
 	// - psi(p - h/2)
 	params[paramInd] -= DERIV_STEP_SIZE;
-	ancillaCircuit(qubits, params, numParams);
+	ansatzCircuit(qubits, params, numParams);
 	for (long long int i=0LL; i < length; i++)
 		deriv[i] -= getRealAmpEl(qubits, i) + I*getImagAmpEl(qubits, i);
 	
@@ -172,18 +133,18 @@ void applyDiagHamiltonian(
 
 /**
  * Populates the A and C matrices of derivatives inside of mem, using derivatives of 
- * the wavefunction which is produced by ancillaCircuit with the given parameters. 
+ * the wavefunction which is produced by ansatzCircuit with the given parameters. 
  * mem.matrA: A_ij = 2*Re{ d <psi(p)| dp_i . d |psi(p)> dp_j }
  * mem.vecC: C_i = -2*Re{ d <psi(p)| dp_i . H . |psi(p)> }
  * The derivs and hamilState data structures in mem are also modified
  */
 void computeDerivMatrices(
-	evolverMemory *mem, void (*ancillaCircuit)(MultiQubit, double*, int),
+	evolverMemory *mem, void (*ansatzCircuit)(MultiQubit, double*, int),
 	MultiQubit qubits, double* params, double* diagHamiltonian) 
 {
 	// collect wavef derivs w.r.t each parameter
 	for (int i=0; i < mem->numParams; i++)
-		findDeriv(mem->derivs[i], mem->stateSize, ancillaCircuit, qubits, params, mem->numParams, i);
+		findDeriv(mem->derivs[i], mem->stateSize, ansatzCircuit, qubits, params, mem->numParams, i);
 	
 	// populate matrix A with inner product of derivs
 	for (int i=0; i < mem->numParams; i++)
@@ -191,199 +152,173 @@ void computeDerivMatrices(
 			gsl_matrix_set(mem->matrA, i, j, realInnerProduct(mem->derivs[i], mem->derivs[j], mem->stateSize));
 	
 	// populate vector C with inner product of derivs and H on psi
-	ancillaCircuit(qubits, params, mem->numParams);
+	ansatzCircuit(qubits, params, mem->numParams);
 	applyDiagHamiltonian(mem->hamilState, mem->stateSize, qubits, diagHamiltonian);
 	for (int i=0; i < mem->numParams; i++)
 		gsl_vector_set(mem->vecC, i, -realInnerProduct(mem->derivs[i], mem->hamilState, mem->stateSize));
 }
 
 
-/*
-void evolveParamsByGD(
-	evolverMemory *mem,
-	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize) 
-{
-	// compute matrices A and C
-	computeDerivMatrices(mem, qubits, params, diagHamiltonian);
+/**
+ * Householder (orthogonal equations) solve the least-squares approximation
+ */
+int approxParamsByLeastSquares(evolverMemory *mem) {
+	
+	printf("Using Least Squares (Householder)\n");
 
-	for (int i=0; i < mem->numParams; i++) 
-		params[i] += fmod(timeStepSize*gsl_vector_get(mem->vecC, i), 2*M_PI);
-		 
-	applyAncillaCircuit(qubits, params, mem->numParams);
+	// compute A^T A and A^T C
+	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, mem->matrA, mem->matrA, 0.0, mem->matrATA);
+	gsl_blas_dgemv(CblasTrans, 1.0, mem->matrA, mem->vecC, 0.0, mem->vecATC);
+	
+	// solve A^T A paramChange = A^T C, returning success flag
+	return gsl_linalg_HH_solve(mem->matrATA, mem->vecATC, mem->paramChange);
 }
-*/
 
 
 /**
- * Given a list of parameters, a parameterised wavefunction (through ancillaCircuit) and
+ * LU solve the same constraints with the final var set to 0
+ * (Sam and Xiao's current method)
+ */
+int approxParamsByRemovingVar(evolverMemory *mem) {
+	
+	printf("Using Var Removal\n");
+		
+	// Asub = shave off final col of A
+	for (int i=0; i < mem->numParams; i++)
+		for (int j=0; j < mem->numParams-1; j++)
+			gsl_matrix_set(mem->matrASub, i, j, gsl_matrix_get(mem->matrA, i, j));
+	
+	// Csub = remove final elem of C
+	for (int i=0; i < mem->numParams-1; i++)
+		gsl_vector_set(mem->vecCSub, i, gsl_vector_get(mem->vecC, i));
+	
+	// solve Asub paramChangeSub = Csub
+	int swaps;
+	gsl_linalg_LU_decomp(mem->matrASub, mem->permASub, &swaps);
+	int singular = gsl_linalg_LU_solve(mem->matrASub, mem->permASub, mem->vecCSub, mem->paramChangeSub);
+	
+	// copy paramChangeSub to paramChange
+	gsl_vector_set(mem->paramChange, mem->numParams-1, 0);
+	for (int i=0; i < mem->numParams - 1; i++)
+		gsl_vector_set(mem->paramChange, i, gsl_vector_get(mem->paramChangeSub, i));
+	
+	// flag whether this LU solve failed
+	return singular;
+}
+
+
+/**
+ * Solve for paramChange by truncated SVD
+ */
+int approxParamsByTSVD(evolverMemory *mem) { 
+	
+	printf("Using TVSD\n");
+	
+	double residSum;
+	size_t singValsKept;
+	return gsl_multifit_linear_tsvd(
+		mem->matrA, mem->vecC, mem->svdTolerance, mem->paramChange, 
+		mem->svdCovar, &residSum, &singValsKept, mem->svdSpace);
+}
+
+
+
+/**
+ * Given a list of parameters, a parameterised wavefunction (through ansatzCircuit) and
  * a diagonal Hamiltonian, modifies the parameters by a single time-step under imaginary time 
- * evolution, using Euler's method. defaultAncillaCircuit may be passed in lieu of a custom one.
+ * evolution, using Euler's method. defaultAnsatzCircuit may be passed in lieu of a custom one.
  * Param evolution is done by repeatedly simulating a parameterised circuit and using finite-
  * difference approximations of derivatives to populate and here solve a family of
- * linear equations of the parameters. This function should update the parameters so that
- * the parameterised wavefunction moves closer to the ground-state of the given Hamiltonian.
- * The output is 0 if updating the parameters is successful, otherwise a 1 is returned which 
- * indicates timeStepSize was too large and a parameter experienced too great a change,
- * and none of the parameters have been updated.
+ * linear equations of the parameters. If the numerical solving fails (the matrices are ill-conditioned),
+ * the passed illPosedRecoveryMethod is called to approximate a solution, which must modify 
+ * mem->paramChange; approxParamsByLeastSquares, ...ByRemovingVar, ...ByTVSD may be passed.
+ * This function should update the parameters so that the parameterised wavefunction moves closer to the 
+ * ground-state of the given Hamiltonian, though don't necessarily long-term converge to sol.
+ * A return of evolveOutcome:SUCCESS indicates direct numerical updating of the params worked,
+ * while RECOVERED indicates the 
+ * and FAILED indicates the illPosedRecoveryMethod also numerically failed.
  * Updates the wavefunction in qubits under the new parameters.
  * mem contains memory for matrices and arrays which are modified
- */
-int evolveParams(
-	evolverMemory *mem, void (*ancillaCircuit)(MultiQubit, double*, int),
-	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize) 
+  * @param mem						data structures created with prepareEvolverMemory()
+  * @param ansatzCircuit			parameterised circuit to apply to qubits which generates wavefunc(params)
+  * @param illPosedRecoveryMethod function to solve/update paramChange when direct LU solution fails
+  * @param qubits					QuEST qubits instance
+  * @param params					list of current values of the parameters, to be updated
+  * @param diagHamiltonian			the diagonal terms of the Hamiltonian, under which to imag-time evolve
+  * @param timeStepSize			size of the step-size in imag-time
+  * @param wrapParams				1 to keep params in [0, 2pi) by wrap-around, 0 to let them grow
+  * @return SUCCESS 				indicates direct numerical updating (by LU decomposition) of the params worked 
+  * @return RECOVERED				indicaets illPosedRecoveryMethod had to be used (LU failed) but was successful
+  * @return FAILED					indicates direct LU solving and illPosedRecoveryMethod failed
+  */
+evolveOutcome evolveParams(
+	evolverMemory *mem, 
+	void (*ansatzCircuit)(MultiQubit, double*, int), 
+	int (*illPosedRecoveryMethod)(evolverMemory*),
+	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, int wrapParams) 
 {
-	// compute matrices A and C
-	computeDerivMatrices(mem, ancillaCircuit, qubits, params, diagHamiltonian);
+	evolveOutcome outcome = SUCCESS;
 	
-	// // solve A paramChange = C
+	// compute matrices A and C
+	computeDerivMatrices(mem, ansatzCircuit, qubits, params, diagHamiltonian);
+	
+	// solve A paramChange = C
 	int swaps, singular;
 	gsl_linalg_LU_decomp(mem->matrA, mem->permA, &swaps);
 	singular = gsl_linalg_LU_solve(mem->matrA, mem->permA, mem->vecC, mem->paramChange);
-	
-	if (singular) {
-		
-		/*
-		 * LEAST SQUARES METHOD: increased energy drastically
-		 * 
-		printf("A was singular. Using least squares:\n");
-		// compute A^T A
-		gsl_matrix *matrTranspAA = gsl_matrix_alloc(mem->numParams, mem->numParams);
-		gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, mem->matrA, mem->matrA, 0.0, matrTranspAA);
-		
-		// compute A^T C
-		gsl_vector *vecTranspAC = gsl_vector_alloc(mem->numParams);
-		gsl_blas_dgemv(CblasTrans, 1.0, mem->matrA, mem->vecC, 0.0, vecTranspAC);
-		
-		// solve A^T A paramChange = A^T C
-		gsl_linalg_LU_decomp(matrTranspAA, mem->permA, &swaps);
-		singular = gsl_linalg_LU_solve(matrTranspAA, mem->permA, vecTranspAC, mem->paramChange);
-		
-		printf("Reattempted singular: %d\n", singular);
-		gsl_matrix_free(matrTranspAA);
-		gsl_vector_free(vecTranspAC);
-		*/
-		
 
-		
-		/*
-		 * LEAST SQUARES METHOD with ORTHOGONAL EQUATIONS (Householder)
-		 * works and is stable, but energy can still increase (and params leave 2PI)
-		 */
-		
-		printf("A was singular. Using least squares with householder:\n");
-		// compute A^T A
-		gsl_matrix *matrTranspAA = gsl_matrix_alloc(mem->numParams, mem->numParams);
-		gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, mem->matrA, mem->matrA, 0.0, matrTranspAA);
-		
-		// compute A^T C
-		gsl_vector *vecTranspAC = gsl_vector_alloc(mem->numParams);
-		gsl_blas_dgemv(CblasTrans, 1.0, mem->matrA, mem->vecC, 0.0, vecTranspAC);
-		
-		// solve A^T A paramChange = A^T C
-		//gsl_linalg_LU_decomp(matrTranspAA, mem->permA, &swaps);
-		//singular = gsl_linalg_LU_solve(matrTranspAA, mem->permA, vecTranspAC, mem->paramChange);
-		singular = gsl_linalg_HH_solve(matrTranspAA, vecTranspAC, mem->paramChange);
-		
-		printf("Reattempted singular: %d\n", singular);
-		gsl_matrix_free(matrTranspAA);
-		gsl_vector_free(vecTranspAC);
-		
-		
-		
-		
-		/**
-		 * TRY:
-		 * when underdetermined, pick a sol such that some very small params go exactly to 0
-		*/
-		
-		
-		
-		
-		/*
-		 * SAM/XIAO SHAVING OFF ROW/COL: increases energy mildly, and often needs to be recursed
-		 */
-		 
-		 		// WHY IS PARAM CHANGE EXTREME FOR NON-SINGULAR MATRICES WHEN STARTING IN |+>???
-		/*
-		printf("A was singular. Shaving off rows/columns blindly.\n");
-		
-		// Asub = shave off final row/col of A
-		gsl_matrix *matrAsub = gsl_matrix_alloc(mem->numParams - 1, mem->numParams - 1);
-		for (int i=0; i < mem->numParams-1; i++)
-			for (int j=0; j < mem->numParams-1; j++)
-				gsl_matrix_set(matrAsub, i, j, gsl_matrix_get(mem->matrA, i, j));
-		
-		// Csub = remove final elem of C
-		gsl_vector *vecCsub = gsl_vector_alloc(mem->numParams -1);
-		for (int i=0; i < mem->numParams-1; i++)
-			gsl_vector_set(vecCsub, i, gsl_vector_get(mem->vecC, i));
-		
-		gsl_permutation *permAsub = gsl_permutation_alloc(mem->numParams - 1);
-		gsl_linalg_LU_decomp(matrAsub, permAsub, &swaps);
-		
-		gsl_vector *paramChangeSub = gsl_vector_alloc(mem->numParams - 1);
-		singular = gsl_linalg_LU_solve(matrAsub, permAsub, vecCsub, paramChangeSub);
-		
-		if (singular)
-			printf("The sub matrix was still singular! Skipping...\n");
-		printf("Pre updated:\n");
-		for (int i=0; i < mem->numParams; i++)
-			printf("p%d: %lf\n", i, params[i]);
-		
-		for (int i=0; i < mem->numParams - 1; i++)
-			params[i] += timeStepSize * gsl_vector_get(paramChangeSub, i);
-			
-		printf("Post updated:\n");
-		for (int i=0; i < mem->numParams; i++)
-			printf("p%d: %lf\n", i, params[i]);
-		
-		gsl_matrix_free(matrAsub);
-		gsl_vector_free(vecCsub);
-		gsl_permutation_free(permAsub);
-		gsl_vector_free(paramChangeSub);
-		*/
-		
-		
-		
-		/* HOUSE HOLDER SOLVE ORIGINAL */
-		
-		//printf("Lin solve failed: using Householder transformation\n");
-		//singular = gsl_linalg_HH_solve(mem->matrA, mem->vecC, mem->paramChange);
-		
-		if (singular)
-			printf("ahhhh it too was singular! Skipping...\n");
-		else {
-			for (int i=0; i < mem->numParams; i++) {
-				printf("change in p%d:\t%lf\n", i, timeStepSize*gsl_vector_get(mem->paramChange,i));
-				params[i] += timeStepSize*gsl_vector_get(mem->paramChange,i);
-			}
-		}
-		
-		
-	} else {
-		
-		// if a param changes too drastically, don't update and report error
-		/*
-		for (int i=0; i < mem->numParams; i++)
-			if (timeStepSize*gsl_vector_get(mem->paramChange, i) > MAX_PARAM_CHANGE)
-				return 1;
-		*/
-		
-		// update params
-		for (int i=0; i < mem->numParams; i++)
-			params[i] += timeStepSize*gsl_vector_get(mem->paramChange, i);
+	// if that failed, try an approximation
+	if (singular) {
+		outcome = RECOVERED;
+		singular = illPosedRecoveryMethod(mem);
+	}
+
+	// if that failed, give up
+	if (singular) {
+		outcome = FAILED;
+		return outcome;
 	}
 	
+	// update params
+	for (int i=0; i < mem->numParams; i++)
+		params[i] += timeStepSize*gsl_vector_get(mem->paramChange, i);
 	
 	// wrap-around params in [0, 2pi] to avoid overflow
-	for (int i=0; i < mem->numParams; i++)
-		params[i] = fmod(params[i], 2*M_PI);
+	if (wrapParams) {
+		for (int i=0; i < mem->numParams; i++)
+			params[i] = fmod(params[i], 2*M_PI);
+	}
 	
 	// update the wavefunction with new params
-	ancillaCircuit(qubits, params, mem->numParams);
+	ansatzCircuit(qubits, params, mem->numParams);
 	
 	// indicate params updated successfully
-	return 0;
+	return outcome;
+}
+
+
+/**
+ * Behaves similarly to evolveParams, but using gradient descent (disregards A matrix)
+ * and cannot numerically fail (besides repeated use not converging to a solution).
+ */
+void evolveParamsByGradientDescent(
+	evolverMemory *mem, void (*ansatzCircuit)(MultiQubit, double*, int), 
+	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, int wrapParams) 
+{
+	// compute matrices A and C
+	computeDerivMatrices(mem, ansatzCircuit, qubits, params, diagHamiltonian);
+	
+	// update params
+	for (int i=0; i < mem->numParams; i++)
+		params[i] += timeStepSize*gsl_vector_get(mem->vecC, i);
+	
+	// wrap-around params in [0, 2pi] to avoid overflow
+	if (wrapParams) {
+		for (int i=0; i < mem->numParams; i++)
+			params[i] = fmod(params[i], 2*M_PI);
+	}
+	
+	ansatzCircuit(qubits, params, mem->numParams);
 }
 
 
@@ -412,6 +347,19 @@ evolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 	memory.vecC = gsl_vector_alloc(memory.numParams);
 	memory.paramChange = gsl_vector_alloc(memory.numParams);
 	
+	// allocate ill-posed gsl objects
+	memory.matrATA = gsl_matrix_alloc(memory.numParams, memory.numParams);
+	memory.vecATC = gsl_vector_alloc(memory.numParams);
+	
+	memory.matrASub = gsl_matrix_alloc(memory.numParams, memory.numParams - 1);
+	memory.vecCSub = gsl_vector_alloc(memory.numParams - 1);
+	memory.permASub = gsl_permutation_alloc(memory.numParams);
+	memory.paramChangeSub = gsl_vector_alloc(memory.numParams - 1);
+	
+	memory.svdTolerance = DEFAULT_SVD_TOLERANCE;
+	memory.svdSpace = gsl_multifit_linear_alloc(memory.numParams, memory.numParams);
+	memory.svdCovar = gsl_matrix_alloc(memory.numParams, memory.numParams);
+	
 	return memory;
 }
 
@@ -422,15 +370,29 @@ evolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
  */
 void freeEvolverMemory(evolverMemory *memory) {
 	
+	// free state info
 	for (int i=0; i < memory->numParams; i++)
 		free(memory->derivs[i]);
 		
 	free(memory->derivs);
 	free(memory->hamilState);
 	
+	// free invertible-A structures
 	gsl_matrix_free(memory->matrA);
 	gsl_permutation_free(memory->permA);
 	gsl_vector_free(memory->vecC);
 	gsl_vector_free(memory->paramChange);
+	
+	// free ill-posed A structures
+	gsl_matrix_free(memory->matrATA);
+	gsl_vector_free(memory->vecATC);
+	
+	gsl_matrix_free(memory->matrASub);
+	gsl_vector_free(memory->vecCSub);
+	gsl_permutation_free(memory->permASub);
+	gsl_vector_free(memory->paramChangeSub);
+	
+	gsl_multifit_linear_free(memory->svdSpace);
+	gsl_matrix_free(memory->svdCovar);
 }
 
