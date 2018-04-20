@@ -45,7 +45,7 @@ int main(int narg, char *varg[]) {
 	if (narg != 10) {
 		printf("ERROR! Call with arguments: ");
 		printf("num_bools num_params rseed threshold[0 to 1] timestep[0 for auto] max_iters wrap_params ");
-		printf("deriv_accuracy[1 to 4] matrNoise[0 to 1]\n");
+		printf("deriv_accuracy[1 to 4] matrix_noise[0 to 1]\n");
 		return 1;
 	}
 	
