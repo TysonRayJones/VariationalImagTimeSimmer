@@ -94,6 +94,8 @@ typedef enum evolveOutcome {SUCCESS, RECOVERED, FAILED} evolveOutcome;
   * @param diagHamiltonian			the diagonal terms of the Hamiltonian, under which to imag-time evolve
   * @param timeStepSize			size of the step-size in imag-time
   * @param wrapParams				1 to keep params in [0, 2pi) by wrap-around, 0 to let them grow
+  * @param derivAccuracy			accuracy of finite-difference approx to param derivs in {1, 2, 3, 4}
+  * @param matrNoise				noise (in [0, 1]) to add to A and C matrices before solving. each elem += +- noise*val
   * @return SUCCESS 				indicates direct numerical updating (by LU decomposition) of the params worked 
   * @return RECOVERED				indicaets illPosedRecoveryMethod had to be used (LU failed) but was successful
   * @return FAILED					indicates direct LU solving and illPosedRecoveryMethod failed
@@ -102,7 +104,8 @@ evolveOutcome evolveParams(
 	evolverMemory *mem, 
 	void (*ansatzCircuit)(MultiQubit, double*, int), 
 	int (*illPosedRecoveryMethod)(evolverMemory*),
-	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, int wrapParams);
+	MultiQubit qubits, double* params, double* diagHamiltonian, 
+	double timeStepSize, int wrapParams, int derivAccuracy, double matrNoise);
 	
 /**
  * Behaves similarly to evolveParams, but using gradient descent (disregards A matrix)
@@ -110,7 +113,8 @@ evolveOutcome evolveParams(
  */
 void evolveParamsByGradientDescent(
 	evolverMemory *mem, void (*ansatzCircuit)(MultiQubit, double*, int), 
-	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, int wrapParams);
+	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, int wrapParams,
+	int derivAccuracy);
 
 /**
  * Allocates memory for the data structures needed by the evolveParams function,

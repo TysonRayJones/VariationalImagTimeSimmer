@@ -42,9 +42,10 @@ int main(int narg, char *varg[]) {
 	 * GET CMD ARGS 
 	 */
 	 	 
-	if (narg != 8) {
+	if (narg != 10) {
 		printf("ERROR! Call with arguments: ");
-		printf("num_bools num_params rseed threshold[0 to 1] timestep[0 for auto] max_iters wrap_params\n");
+		printf("num_bools num_params rseed threshold[0 to 1] timestep[0 for auto] max_iters wrap_params ");
+		printf("deriv_accuracy[1 to 4] matrNoise[0 to 1]\n");
 		return 1;
 	}
 	
@@ -55,6 +56,8 @@ int main(int narg, char *varg[]) {
 	double timeStep; sscanf(varg[5], "%lf", &timeStep);
 	int maxIterations = atoi(varg[6]);
 	int wrapParams = atoi(varg[7]);
+	int derivAccuracy = atoi(varg[8]);
+	double matrNoise; sscanf(varg[9], "%lf", &matrNoise);
 	
 	if (numBools < 4) {
 		printf("ERROR! Minimum num_bools is 4\n");
@@ -150,7 +153,7 @@ int main(int narg, char *varg[]) {
 		
 		outcome = evolveParams(
 			&mem, defaultAnsatzCircuit, approxParamsByTSVD,
-			qubits, params, hamil, timeStep, wrapParams);
+			qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
 			
 		if (outcome == RECOVERED) 
 			recoveredIterations[numRecoveries++] = step;
@@ -171,12 +174,15 @@ int main(int narg, char *varg[]) {
 		step += 1;
 	}
 	
+	
 	/*
-	 * ANALYSE RESULTS
+	 * SAVE RESULTS
 	 */
 	
 	// record <E>, prob evolutions, recovered iterations
 	FILE* file = openAssocWrite(OUTPUT_FILE);
+	writeIntToAssoc(file, "derivAccuracy", derivAccuracy);
+	writeDoubleToAssoc(file, "matrNoise", matrNoise, 5);
 	writeIntToAssoc(file, "wrapParams", wrapParams);
 	writeDoubleToAssoc(file, "timeStep", timeStep, 10);
 	writeIntToAssoc(file, "numBools", numBools);
