@@ -16,14 +16,16 @@ The QuEST `makefile` must be adapted for GSL. The changes are outlined [here](ht
 
 # Running
 
-`Variational3SATSolver` accepts 7 command-line arguments:
+`Variational3SATSolver` accepts 9 command-line arguments:
 - `num_bools`: 3SAT problem size (a random instance will be generated)
  - `num_params`: the number of parameterised gates in the ansatz circuit
  -  `rseed`: random seed for 3SAT generation 
  - `threshold`: the probability of the solution state which when achieved, parameter evolution ends
  - `timestep`: multiplies the change the parameters experience at each imag-time evolution step. Passing `0` will use the smallest stable time-step, ~**max(energyEigVal)**
  - `max_iters`: maximum iterations to perform before halting (if not already converged to `threshold`)
- -  `wrap_params`: whether parameters will be wrapped-around to remain in **[0, 2 PI)** after each evolution step.
+ -  `wrap_params`: whether (0 or 1) parameters will be wrapped-around to remain in **[0, 2 PI)** after each evolution step.
+ - `deriv_accuracy`: order of finite difference deriv approx to use (1 to 4) in constructing A and C
+ - `matrix_noise`: percent (0 to 1) noise to vary A and C elements by before solving for parameter evolution
 
 
 # Customising
