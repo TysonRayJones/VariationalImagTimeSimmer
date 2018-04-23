@@ -16,15 +16,24 @@
 
 #include "QuEST/qubits.h"
 
-/** greatest change in parameter allowed in a single evolve step before flagged */
-double MAX_PARAM_CHANGE = 1.572; // approx pi/2
-// NOT USED ATM 
+/** when approx'ing param change by TSVD, truncate SVs smaller than below*max */
+double DEFAULT_SVD_TOLERANCE = 0.01;
 
-/** when approx'ing ill-posed param change by TSVD, truncate SVs smaller than below*max */
-double DEFAULT_SVD_TOLERANCE = 0.001;
+/** 
+ * when approx'ing the param change by Tikhonov regularisation, this decides
+ * how many different Tikhonov Parameters will be tested in the search for the
+ * optimal (by L-curve testing) 
+ */
+double TIKHONOV_PARAM_SEARCH_SIZE = 3; // must be >= 3
+
+/** 
+ * minimum value allowed of the Tikhonov regularisation param (weighting of min param constraint), 
+ * to ensure that the optimal value doesn't cause too large a change in params
+ */
+double TIKHONOV_REG_MIN_PARAM = 0.0001;
 
 /** size of the change in parameter when approxing wavefunction derivatives */
-double DERIV_STEP_SIZE = 1E-5; 
+double DERIV_STEP_SIZE = 1E-8; 
 
 /** finite-dif first deriv coefficients of psi(x+nh) for n > 0, or -1*(that for n < 0) */
 double FINITE_DIFFERENCE_COEFFS[4][4] = {
@@ -77,16 +86,6 @@ void defaultAnsatzCircuit(MultiQubit qubits, double* params, int numParams) {
 		if (paramInd < numParams)
 			controlledRotateY(qubits, qubits.numQubits-1, 0, params[paramInd++]);
 	}
-	
-	/**
-	 * START MOSTLY IN GROUND AND SOME EXCITED STATES TO SEE WHY THE EIGENSTATES ARE ATTRACTING
-	 * 
-	 */
-	 
-	 
-	/**
-	 *	PLOT SPECTRUM EVOLUTION (to show getting stuck in first excited)
-	 */
 }
 
 
@@ -188,25 +187,24 @@ void computeDerivMatrices(
 
 /**
  * adds noise to A and C matrices in mem. 
- * Each element experiences += +- fractionalVar * value, where the sign is randomly chosen
+ * Each element experiences a chance in value of [-1,1]*fractionalVar * value
  */
 void addNoiseToDerivMatrices(evolverMemory *mem, double fractionalVar) {
 	
-	int sign;
-	double oldval, newval;
+	double oldval, newval, randd;
 			
 	for (int i=0; i < mem->numParams; i++) {
 		
-		sign = -1 + 2*(rand() < RAND_MAX/2.0);
 		oldval = gsl_vector_get(mem->vecC, i);
-		newval = (1 + sign*fractionalVar)*oldval;
+		randd = rand() / (double) RAND_MAX;
+		newval = oldval + fractionalVar * fabs(oldval) * (2*randd - 1);
 		gsl_vector_set(mem->vecC, i, newval);
 		
 		for (int j=0; j < mem->numParams; j++) {
 			
-			sign = -1 + 2*(rand() < RAND_MAX/2.0);
 			oldval = gsl_matrix_get(mem->matrA, i, j);
-			newval = (1 + sign*fractionalVar)*oldval;
+			randd = rand() / (double) RAND_MAX;
+			newval = oldval + fractionalVar * fabs(oldval) * (2*randd - 1);
 			gsl_matrix_set(mem->matrA, i, j, newval);
 		}
 	}
@@ -214,11 +212,27 @@ void addNoiseToDerivMatrices(evolverMemory *mem, double fractionalVar) {
 
 
 /**
+ * Attempts to perform direct solving by LU decomposition, which is
+ * unstable and liable to fail.
+ */
+int approxParamsByLUDecomp(evolverMemory *mem) {
+	
+	// Simon says: APPAERNTLY THIS OFTEN PICKS ANY SOLUTION: LU comp is stored in Perm
+	// Simon gets different answers for resolving
+	int swaps, singular;
+	gsl_linalg_LU_decomp(mem->matrA, mem->permA, &swaps);
+	singular = gsl_linalg_LU_solve(mem->matrA, mem->permA, mem->vecC, mem->paramChange);
+	if (singular)
+		printf("Direct LU decomposition failed! Aborting...\n");
+		
+	return singular;
+}
+
+
+/**
  * Householder (orthogonal equations) solve the least-squares approximation
  */
 int approxParamsByLeastSquares(evolverMemory *mem) {
-	
-	printf("Using Least Squares (Householder)\n");
 
 	// compute A^T A and A^T C
 	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, mem->matrA, mem->matrA, 0.0, mem->matrATA);
@@ -234,8 +248,6 @@ int approxParamsByLeastSquares(evolverMemory *mem) {
  * (Sam and Xiao's current method)
  */
 int approxParamsByRemovingVar(evolverMemory *mem) {
-	
-	printf("Using Var Removal\n");
 		
 	// Asub = shave off final col of A
 	for (int i=0; i < mem->numParams; i++)
@@ -266,8 +278,6 @@ int approxParamsByRemovingVar(evolverMemory *mem) {
  */
 int approxParamsByTSVD(evolverMemory *mem) { 
 	
-	printf("Using TVSD\n");
-	
 	double residSum;
 	size_t singValsKept;
 	return gsl_multifit_linear_tsvd(
@@ -277,24 +287,92 @@ int approxParamsByTSVD(evolverMemory *mem) {
 
 
 /**
+ * Solve for paramChange by Tikhonov regularisation:
+ * min ||C - A paramChange||^2 + tikhonovParam^2 || paramChange ||^2
+ * The tikhonov param is estimated using the L-curve criterion, using
+ * as many samples as TIKHONOV_PARAM_SEARCH_SIZE (in mem obj lengths)
+ * and restricted to be >= TIKHONOV_REG_MIN_PARAM to ensure params
+ * don't vary wildly
+ * 
+ * https://www.gnu.org/software/gsl/doc/html/lls.html
+ * http://www2.compute.dtu.dk/~pcha/DIP/chap5.pdf
+ * http://people.bath.ac.uk/mamamf/talks/ilas.pdf
+ */
+int approxParamsByTikhonov(evolverMemory *mem) {
+	
+	// whether we fail to sample tikhonovParams, fail to optimise it,
+	// or fail to Tikhonov solve
+	int failure;
+	
+	// compute the SVD in the workspace (needed for L-curve and solve)
+	failure = gsl_multifit_linear_svd(mem->matrA, mem->svdSpace);
+	if (failure) {
+		printf("Computing SVD of matrA failed in Titkhonov! Aborting...\n");
+		return failure;
+	}
+	
+	// sample the system under different regularisation params (build L-curve)
+	failure = gsl_multifit_linear_lcurve(
+		mem->vecC, mem->tikhonovParamSamples, 
+		mem->tikhonovParamRho, mem->tikhonovParamEta, mem->svdSpace
+	);
+	if (failure) {
+		printf("Populating the Tikhonov regularisation param space failed! Aborting...\n");
+		return failure;
+	}
+	
+	// choose the best regularisation param (hardcode 0.02 performs ok)
+	size_t tikhonovParamIndex;
+	failure = gsl_multifit_linear_lcorner(
+		mem->tikhonovParamRho, mem->tikhonovParamEta, &tikhonovParamIndex
+	);
+	if (failure) {
+		printf("Choosing the optimal Tikhonov regularisation param (by L-curve corner) failed! Aborting...\n");
+		return failure;
+	}
+	
+	// restrict the regularisation param from being too small (to keep ||paramChange|| small)
+	double tikhonovParam = gsl_vector_get(mem->tikhonovParamSamples, tikhonovParamIndex); 
+	if (tikhonovParam <= TIKHONOV_REG_MIN_PARAM)
+		tikhonovParam = TIKHONOV_REG_MIN_PARAM;
+		
+	// the error ||C - A paramChange|| can be monitored
+	double residualNorm, paramChangeNorm;
+	
+	// perform Tikhonov regularisation (where L = identity)
+	failure = gsl_multifit_linear_solve(
+		tikhonovParam, mem->matrA, mem->vecC, mem->paramChange,
+		&residualNorm, &paramChangeNorm, mem->svdSpace
+	);
+	if (failure) {
+		printf("Solving Titkhonov under the best regularisation param failed! Aborting...\n");
+	}
+	
+	return failure;
+}
+
+
+/**
  * Given a list of parameters, a parameterised wavefunction (through ansatzCircuit) and
  * a diagonal Hamiltonian, modifies the parameters by a single time-step under imaginary time 
  * evolution, using Euler's method. defaultAnsatzCircuit may be passed in lieu of a custom one.
  * Param evolution is done by repeatedly simulating a parameterised circuit and using finite-
  * difference approximations of derivatives to populate and here solve a family of
- * linear equations of the parameters. If the numerical solving fails (the matrices are ill-conditioned),
- * the passed illPosedRecoveryMethod is called to approximate a solution, which must modify 
- * mem->paramChange; approxParamsByLeastSquares, ...ByRemovingVar, ...ByTVSD may be passed.
- * This function should update the parameters so that the parameterised wavefunction moves closer to the 
- * ground-state of the given Hamiltonian, though don't necessarily long-term converge to sol.
- * A return of evolveOutcome:SUCCESS indicates direct numerical updating of the params worked,
- * while RECOVERED indicates the 
- * and FAILED indicates the illPosedRecoveryMethod also numerically failed.
- * Updates the wavefunction in qubits under the new parameters.
+ * linear equations of the parameters. The passed function inversionMethod is called to approximate 
+ * a solution to A paramChange = C, which must modify  mem->paramChange, and return 0 for success or
+ * 1 for failure. In lieu of a custom method, approxParamsByLeastSquares, ...ByRemovingVar, ...ByTVSD,
+ * ...ByTikhonov may be passed.
+ * Percent noise in the A and C elements can be passed to emulate their inference from experiment.
+ * evolveParams should update the parameters so that the parameterised wavefunction moves closer to the 
+ * ground-state of the given Hamiltonian, though doesn't necessarily long-term converge to sol.
+ * A return of evolveOutcome:SUCCESS indicates  numerical updating of the params worked,
+ * and FAILED indicates the inversionMethod failed.
+ * evolveParams finally updates the wavefunction in qubits under the new parameters, so that you can
+ * monitor wavefunction properties over evolution.
  * mem contains memory for matrices and arrays which are modified
   * @param mem						data structures created with prepareEvolverMemory()
   * @param ansatzCircuit			parameterised circuit to apply to qubits which generates wavefunc(params)
-  * @param illPosedRecoveryMethod function to solve/update paramChange when direct LU solution fails
+  * @param inversionMethod function to solve/update paramChange when direct LU solution fails
   * @param qubits					QuEST qubits instance
   * @param params					list of current values of the parameters, to be updated
   * @param diagHamiltonian			the diagonal terms of the Hamiltonian, under which to imag-time evolve
@@ -302,14 +380,13 @@ int approxParamsByTSVD(evolverMemory *mem) {
   * @param wrapParams				1 to keep params in [0, 2pi) by wrap-around, 0 to let them grow
   * @param derivAccuracy			accuracy of finite-difference approx to param derivs in {1, 2, 3, 4}
   * @param matrNoise				noise (in [0, 1]) to add to A and C matrices before solving. each elem += +- noise*val
-  * @return SUCCESS 				indicates direct numerical updating (by LU decomposition) of the params worked 
-  * @return RECOVERED				indicaets illPosedRecoveryMethod had to be used (LU failed) but was successful
-  * @return FAILED					indicates direct LU solving and illPosedRecoveryMethod failed
+  * @return SUCCESS 				indicates numerical updating (by inversionMethod) of the params worked 
+  * @return FAILED					indicates inversionMethod failed
   */
 evolveOutcome evolveParams(
 	evolverMemory *mem, 
 	void (*ansatzCircuit)(MultiQubit, double*, int), 
-	int (*illPosedRecoveryMethod)(evolverMemory*),
+	int (*inversionMethod)(evolverMemory*),
 	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, 
 	int wrapParams, int derivAccuracy, double matrNoise) 
 {
@@ -322,17 +399,7 @@ evolveOutcome evolveParams(
 	addNoiseToDerivMatrices(mem, matrNoise);
 	
 	// solve A paramChange = C
-	int swaps, singular;
-	gsl_linalg_LU_decomp(mem->matrA, mem->permA, &swaps);
-	singular = gsl_linalg_LU_solve(mem->matrA, mem->permA, mem->vecC, mem->paramChange);
-
-	// if that failed, try an approximation
-	if (singular) {
-		outcome = RECOVERED;
-		singular = illPosedRecoveryMethod(mem);
-	}
-
-	// if that failed, give up
+	int singular = inversionMethod(mem);
 	if (singular)
 		return FAILED;
 
@@ -399,24 +466,35 @@ evolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 	for (int i=0; i < memory.numParams; i++)
 		memory.derivs[i] = malloc(memory.stateSize * sizeof **memory.derivs);
 	
-	// allocate gsl objects
+	// allocate LU-decomp objects
 	memory.matrA = gsl_matrix_alloc(memory.numParams, memory.numParams);
 	memory.permA = gsl_permutation_alloc(memory.numParams);
 	memory.vecC = gsl_vector_alloc(memory.numParams);
 	memory.paramChange = gsl_vector_alloc(memory.numParams);
 	
-	// allocate ill-posed gsl objects
+	// allocate least-squares approx objects
 	memory.matrATA = gsl_matrix_alloc(memory.numParams, memory.numParams);
 	memory.vecATC = gsl_vector_alloc(memory.numParams);
 	
+	// allocate column-removal objects
 	memory.matrASub = gsl_matrix_alloc(memory.numParams, memory.numParams - 1);
 	memory.vecCSub = gsl_vector_alloc(memory.numParams - 1);
 	memory.permASub = gsl_permutation_alloc(memory.numParams);
 	memory.paramChangeSub = gsl_vector_alloc(memory.numParams - 1);
 	
+	// allocate TSVD objects
 	memory.svdTolerance = DEFAULT_SVD_TOLERANCE;
 	memory.svdSpace = gsl_multifit_linear_alloc(memory.numParams, memory.numParams);
 	memory.svdCovar = gsl_matrix_alloc(memory.numParams, memory.numParams);
+	
+	// allocate Tikhonov regularisation objects (uses SVD space)
+	//memory.tikhonovParam = DEFAULT_TIKHONOV_PARAM;
+	memory.tikhonovParamSamples = gsl_vector_alloc(TIKHONOV_PARAM_SEARCH_SIZE);
+	memory.tikhonovParamRho = gsl_vector_alloc(TIKHONOV_PARAM_SEARCH_SIZE);
+	memory.tikhonovParamEta = gsl_vector_alloc(TIKHONOV_PARAM_SEARCH_SIZE);
+	memory.tikhonovVecL = gsl_vector_alloc(memory.numParams);
+	for (int i=0; i < memory.numParams; i++)
+		gsl_vector_set(memory.tikhonovVecL, i, 1);
 	
 	return memory;
 }
@@ -431,26 +509,38 @@ void freeEvolverMemory(evolverMemory *memory) {
 	// free state info
 	for (int i=0; i < memory->numParams; i++)
 		free(memory->derivs[i]);
-		
+	
+	// free arrays
 	free(memory->derivs);
 	free(memory->hamilState);
 	
-	// free invertible-A structures
+	// free LU-decomp structures
 	gsl_matrix_free(memory->matrA);
 	gsl_permutation_free(memory->permA);
 	gsl_vector_free(memory->vecC);
 	gsl_vector_free(memory->paramChange);
 	
-	// free ill-posed A structures
+	// free least-squares structures
 	gsl_matrix_free(memory->matrATA);
 	gsl_vector_free(memory->vecATC);
 	
+	// free column-removal structures
 	gsl_matrix_free(memory->matrASub);
 	gsl_vector_free(memory->vecCSub);
 	gsl_permutation_free(memory->permASub);
 	gsl_vector_free(memory->paramChangeSub);
 	
+	// free TSVD structures
 	gsl_multifit_linear_free(memory->svdSpace);
 	gsl_matrix_free(memory->svdCovar);
+	
+	// free Tikhonov structures
+	gsl_vector_free(memory->tikhonovParamSamples);
+	gsl_vector_free(memory->tikhonovParamRho);
+	gsl_vector_free(memory->tikhonovParamEta);
+	gsl_vector_free(memory->tikhonovVecL);
 }
+
+
+
 

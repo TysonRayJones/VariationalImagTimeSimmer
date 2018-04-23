@@ -57,18 +57,26 @@ typedef struct {
 	gsl_multifit_linear_workspace *svdSpace;
 	gsl_matrix *svdCovar;
 	
+	//double tikhonovParam;
+	gsl_vector *tikhonovParamSamples;
+	gsl_vector *tikhonovParamRho;
+	gsl_vector *tikhonovParamEta;
+	gsl_vector *tikhonovVecL;
+	
 } evolverMemory;
 
 /**
- * provided methods for numerically solving for the change in params when direct LU decomp fails
- * (can be passed to evolveParams)
+ * provided methods for numerically solving for the change in params (pass to evolveParams)
+ * Individiaul descriptions are in param_evolver.c
  */
+int approxParamsByLUDecomp(evolverMemory *mem);
 int approxParamsByLeastSquares(evolverMemory *mem);
 int approxParamsByRemovingVar(evolverMemory *mem);
 int approxParamsByTSVD(evolverMemory *mem);
+int approxParamsByTikhonov(evolverMemory *mem);
 
-/** flags which indicate the success of the numerical methods in evolveParams */
-typedef enum evolveOutcome {SUCCESS, RECOVERED, FAILED} evolveOutcome;
+/** flags which indicate the success of inversionMethod passed to evolveParams */
+typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
 
 /**
  * Given a list of parameters, a parameterised wavefunction (through ansatzCircuit) and
@@ -76,19 +84,21 @@ typedef enum evolveOutcome {SUCCESS, RECOVERED, FAILED} evolveOutcome;
  * evolution, using Euler's method. defaultAnsatzCircuit may be passed in lieu of a custom one.
  * Param evolution is done by repeatedly simulating a parameterised circuit and using finite-
  * difference approximations of derivatives to populate and here solve a family of
- * linear equations of the parameters. If the numerical solving fails (the matrices are ill-conditioned),
- * the passed illPosedRecoveryMethod is called to approximate a solution, which must modify 
- * mem->paramChange; approxParamsByLeastSquares, ...ByRemovingVar, ...ByTVSD may be passed.
- * This function should update the parameters so that the parameterised wavefunction moves closer to the 
- * ground-state of the given Hamiltonian, though don't necessarily long-term converge to sol.
- * A return of evolveOutcome:SUCCESS indicates direct numerical updating of the params worked,
- * while RECOVERED indicates the 
- * and FAILED indicates the illPosedRecoveryMethod also numerically failed.
- * Updates the wavefunction in qubits under the new parameters.
+ * linear equations of the parameters. The passed function inversionMethod is called to approximate 
+ * a solution to A paramChange = C, which must modify  mem->paramChange, and return 0 for success or
+ * 1 for failure. In lieu of a custom method, approxParamsByLeastSquares, ...ByRemovingVar, ...ByTVSD,
+ * ...ByTikhonov may be passed.
+ * Percent noise in the A and C elements can be passed to emulate their inference from experiment.
+ * evolveParams should update the parameters so that the parameterised wavefunction moves closer to the 
+ * ground-state of the given Hamiltonian, though doesn't necessarily long-term converge to sol.
+ * A return of evolveOutcome:SUCCESS indicates  numerical updating of the params worked,
+ * and FAILED indicates the inversionMethod failed.
+ * evolveParams finally updates the wavefunction in qubits under the new parameters, so that you can
+ * monitor wavefunction properties over evolution.
  * mem contains memory for matrices and arrays which are modified
   * @param mem						data structures created with prepareEvolverMemory()
   * @param ansatzCircuit			parameterised circuit to apply to qubits which generates wavefunc(params)
-  * @param illPosedRecoveryMethod function to solve/update paramChange when direct LU solution fails
+  * @param inversionMethod function to solve/update paramChange when direct LU solution fails
   * @param qubits					QuEST qubits instance
   * @param params					list of current values of the parameters, to be updated
   * @param diagHamiltonian			the diagonal terms of the Hamiltonian, under which to imag-time evolve
@@ -96,14 +106,13 @@ typedef enum evolveOutcome {SUCCESS, RECOVERED, FAILED} evolveOutcome;
   * @param wrapParams				1 to keep params in [0, 2pi) by wrap-around, 0 to let them grow
   * @param derivAccuracy			accuracy of finite-difference approx to param derivs in {1, 2, 3, 4}
   * @param matrNoise				noise (in [0, 1]) to add to A and C matrices before solving. each elem += +- noise*val
-  * @return SUCCESS 				indicates direct numerical updating (by LU decomposition) of the params worked 
-  * @return RECOVERED				indicaets illPosedRecoveryMethod had to be used (LU failed) but was successful
-  * @return FAILED					indicates direct LU solving and illPosedRecoveryMethod failed
+  * @return SUCCESS 				indicates numerical updating (by inversionMethod) of the params worked 
+  * @return FAILED					indicates inversionMethod failed
   */
 evolveOutcome evolveParams(
 	evolverMemory *mem, 
 	void (*ansatzCircuit)(MultiQubit, double*, int), 
-	int (*illPosedRecoveryMethod)(evolverMemory*),
+	int (*inversionMethod)(evolverMemory*),
 	MultiQubit qubits, double* params, double* diagHamiltonian, 
 	double timeStepSize, int wrapParams, int derivAccuracy, double matrNoise);
 	

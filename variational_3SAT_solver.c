@@ -38,6 +38,7 @@ double getStableTimeStep(double *hamil, long long int stateSize) {
 int main(int narg, char *varg[]) {
 	
 	
+	
 	/*
 	 * GET CMD ARGS 
 	 */
@@ -77,6 +78,7 @@ int main(int narg, char *varg[]) {
 	}
 	
 	
+	
 	/*
 	 * PREPARE SIMULATION
 	 */
@@ -113,9 +115,10 @@ int main(int narg, char *varg[]) {
 	// set initial param values
 	double params[numParams];
 	for (int i=0; i < numParams; i++)
-		params[i] = 1.0;
-		
-		
+		params[i] = (rand()/(double) RAND_MAX) * 2 * M_PI;
+	
+	
+	
 	/*
 	 * PREPARE DATA RECORDING
 	 */
@@ -139,44 +142,57 @@ int main(int narg, char *varg[]) {
 	int recoveredIterations[maxIterations];
 	
 	
+	
 	/*
 	 * PERFORM SIMULATION
 	 */
 	
-	// evolve until a prob(sol) threshold
 	evolveOutcome outcome;
 	int step=0;
 	double prob = 0;
 	double energy = 0;
 	
+	// keep evolving until we converge or reach max iterations
 	while (step < maxIterations && prob < threshold ) {
 		
+		// update params
 		outcome = evolveParams(
-			&mem, defaultAnsatzCircuit, approxParamsByTSVD,
+			&mem, defaultAnsatzCircuit, approxParamsByTikhonov,
 			qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
 			
-		if (outcome == RECOVERED) 
-			recoveredIterations[numRecoveries++] = step;
 		if (outcome == FAILED) {
-			printf("Numerical recovery failed! Aborting entire sim!\n");
+			printf("Numerical inversion failed! Aborting entire sim!\n");
 			return 1;
 		}
-			
+		
+		// monitor convergence
 		prob = getProbEl(qubits, solState);
 		energy = getExpectedEnergy(qubits, hamil, mem.stateSize);
 		printf("t%d: \t prob(sol) = %f \t <E> = %f\n", step, prob, energy);
 		
+		// record data
 		solProbEvo[step] = prob;
 		expectedEnergyEvo[step] = energy;
 		for (int i=0; i < numParams; i++)
 			paramEvo[i][step] = params[i];
 		
+		// randomly wiggle params
+		/*
+		if (step > 0 && step % 50 == 0) {
+			printf("Wiggling params!");
+			
+			for (int i=0; i < numParams; i++)
+				params[i] += 0.01 * 2*M_PI*(rand() / (double) RAND_MAX);
+		}
+		*/
+		
 		step += 1;
 	}
 	
 	
+	
 	/*
-	 * SAVE RESULTS
+	 * SAVE RESULTS TO FILE
 	 */
 	
 	// record <E>, prob evolutions, recovered iterations
@@ -202,6 +218,7 @@ int main(int narg, char *varg[]) {
 	}
 
 	closeAssocWrite(file);
+	
 	
 	
 	/*
