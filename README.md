@@ -35,7 +35,7 @@ The parameters are updated by the method
 evolveOutcome evolveParams(
 	evolverMemory *mem, 
 	void (*ansatzCircuit)(MultiQubit, double*, int), 
-	int (*illPosedRecoveryMethod)(evolverMemory*),
+	int (*iinversionMethod)(evolverMemory*),
 	MultiQubit qubits, 
 	double* params, 
 	double* diagHamiltonian, 
@@ -43,7 +43,7 @@ evolveOutcome evolveParams(
 	int wrapParams
 );
 ```
-where `ansatzCircuit` and `illPosedRecoveryMethod` are functions you can define and pass, and `mem` is a data structure you must first create with
+where `ansatzCircuit` and `inversionMethod` are functions you can define and pass, and `mem` is a data structure you must first create with
 ```C
 prepareEvolverMemory(MultiQubit qubits, int numParams);
 ```
@@ -63,10 +63,10 @@ In lieu of your own code, `defaultAnsatzCircuit` can be passed.
 
 -------
 
-`illPosedRecoveryMethod` is called when LU decomposition fails to solve for the change in parameters in the given step of the algorithm, and allows an alternative approximation to be used.
+`inversionMethod` is called to numerically solve for the change in the parameters given the matrix equation.
 The function must modify `mem->paramChange` (which is a GSL vector) using the `mem->matrA` and `mem->vecC` matrix/vector, to generate a solution to `matrA paramChange = vecC`, and should return `1` if it also numerically fails.
 
-In lieu of your own code, you can pass `approxParamsByLeastSquares`, `approxParamsByRemovingVar` or `approxParamsByTSVD`; see the code-doc in `param_evolver.h` for details.
+In lieu of your own code, you can pass `approxByLUDecomp`, `approxParamsByLeastSquares`, `approxParamsByRemovingVar`, `approxParamsByTSVD` or `approxParamsByTikhonov`; see the code-doc in `param_evolver.h` for details. I recommend the latter, which ensures `||paramChange||` is small.
 
 Underdetermined equations of `paramChange` can be realised by changing `initStateZero` to `initStatePlus` in `defaultAnsatzCircuit`.
 
