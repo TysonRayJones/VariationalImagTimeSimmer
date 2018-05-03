@@ -7,22 +7,10 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_multifit.h>
 
+#include "hamiltonian_builder.h"
 #include "QuEST/qubits.h"
 
 
-/**
- * Returns the number of parameters needed to repeat the default ansatz circuit
- * numBlocks times, resulting in an equal number of gates (each with an individual parameter)
- * on each qubit
- */
-int chooseDefaultNumParams(MultiQubit qubits, int numBlocks);
-
-/**
- * Applies a default parameterised ansatz circuit to the zero state, modifying
- * the wavefunction in qubits according to the values in params. This can be passed
- * to evolveParams in lieu of a custom ansatz circuit
- */
-void defaultAnsatzCircuit(MultiQubit qubits, double* params, int numParams);
 
 /**
  * A container for the memory used by evolveParams. Is to be created once
@@ -36,6 +24,7 @@ typedef struct {
 	int numParams;
 	double complex **derivs;
 	double complex *hamilState;
+	double complex *initState;
 	
 	// gsl objects for invertible A
 	gsl_matrix *matrA;
@@ -63,17 +52,45 @@ typedef struct {
 	gsl_vector *tikhonovParamEta;
 	gsl_vector *tikhonovVecL;
 	
-} evolverMemory;
+} EvolverMemory;
+
+
+
+/**
+ * Returns the number of parameters needed to repeat the default ansatz circuit
+ * numBlocks times, resulting in an equal number of gates (each with an individual parameter)
+ * on each qubit
+ */
+int chooseDefaultNumParams(MultiQubit qubits, int numBlocks);
+
+/**
+ * Applies a default parameterised ansatz circuit to the zero state, modifying
+ * the wavefunction in qubits according to the values in params. This can be passed
+ * to evolveParams in lieu of a custom ansatz circuit
+ */
+void defaultAnsatzCircuit(EvolverMemory *mem, MultiQubit qubits, double* params, int numParams);
+
+
+/**
+ * Call after preparing qubits in the desired state to feed into
+ * the ansatz at every evolution.
+ * Can be recalled at any time during evolution to change the ansatz
+ */
+void setAnsatzInitState(EvolverMemory *mem, MultiQubit qubits);
+
+
+
+
 
 /**
  * provided methods for numerically solving for the change in params (pass to evolveParams)
  * Individiaul descriptions are in param_evolver.c
  */
-int approxParamsByLUDecomp(evolverMemory *mem);
-int approxParamsByLeastSquares(evolverMemory *mem);
-int approxParamsByRemovingVar(evolverMemory *mem);
-int approxParamsByTSVD(evolverMemory *mem);
-int approxParamsByTikhonov(evolverMemory *mem);
+int approxParamsByLUDecomp(EvolverMemory *mem);
+int approxParamsByLeastSquares(EvolverMemory *mem);
+int approxParamsByRemovingVar(EvolverMemory *mem);
+int approxParamsByTSVD(EvolverMemory *mem);
+int approxParamsByTikhonov(EvolverMemory *mem);
 
 /** flags which indicate the success of inversionMethod passed to evolveParams */
 typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
@@ -110,10 +127,10 @@ typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
   * @return FAILED					indicates inversionMethod failed
   */
 evolveOutcome evolveParams(
-	evolverMemory *mem, 
-	void (*ansatzCircuit)(MultiQubit, double*, int), 
-	int (*inversionMethod)(evolverMemory*),
-	MultiQubit qubits, double* params, double* diagHamiltonian, 
+	EvolverMemory *mem, 
+	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
+	int (*inversionMethod)(EvolverMemory*),
+	MultiQubit qubits, double* params, Hamiltonian hamil,
 	double timeStepSize, int wrapParams, int derivAccuracy, double matrNoise);
 	
 /**
@@ -121,22 +138,22 @@ evolveOutcome evolveParams(
  * and cannot numerically fail (besides repeated use not converging to a solution).
  */
 void evolveParamsByGradientDescent(
-	evolverMemory *mem, void (*ansatzCircuit)(MultiQubit, double*, int), 
-	MultiQubit qubits, double* params, double* diagHamiltonian, double timeStepSize, int wrapParams,
-	int derivAccuracy);
+	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
+	MultiQubit qubits, double* params, Hamiltonian hamil, 
+	double timeStepSize, int wrapParams, int derivAccuracy);
 
 /**
  * Allocates memory for the data structures needed by the evolveParams function,
  * for a given number of blocks. The memory should be kept for the lifetime of the
  * evolver simulation, and afterward freed with freeEvolverMemory
  */
-evolverMemory prepareEvolverMemory(MultiQubit qubits, int numBlocks);
+EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numBlocks);
 
 /**
  * Frees the memory allocated with prepareEvolverMemory. 
  * This should be done when there are no more calls to evolveParams
  */
-void freeEvolverMemory(evolverMemory *memory);
+void freeEvolverMemory(EvolverMemory *memory);
 
 
 #endif // PARAM_EVOLVER_H_

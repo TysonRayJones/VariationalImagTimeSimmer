@@ -18,7 +18,7 @@ EXE = Variational3SATSolver
 # USER SOURCE FILES
 # This makefile expects all user sources to be in the root directory.
 # If using more than one source, separate by spaces
-MY_C_SOURCES = variational_3SAT_solver param_evolver hamiltonian_builder sat_generator mmaformatter
+MY_C_SOURCES = variational_3SAT_solver param_evolver true_evolver hamiltonian_builder sat_generator mmaformatter
 
 # ENABLE DISTRIBUTED PROCESSING (ALLOWS MULTIPLE NODES)
 # On: 1, Off: 0
