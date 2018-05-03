@@ -1,12 +1,19 @@
 
 #include "true_evolver.h"
 
+#include <stdio.h>
 #include <math.h>
 #include <complex.h>
+#include <QuEST.h>
 
-#include "QuEST/qubits.h"
+#include "hamiltonian_builder.h"
 
-void evolveWavefunction(MultiQubit qubits, double* hamil, double timeStep) {
+
+/**
+ * Evolves the wavefunction under the schrodinger equation by amount timeStep 
+ * in imaginary time, using fourth-order runge-kutta
+ */
+void evolveUnderDiagHamil(MultiQubit qubits, double* hamil, double timeStep) {
 	
 	// DE: dy/ds = - H y
 	
@@ -42,5 +49,28 @@ void evolveWavefunction(MultiQubit qubits, double* hamil, double timeStep) {
 	for (long long int i=0LL; i < qubits.numAmps; i++) {
 		qubits.stateVec.real[i] /= norm;
 		qubits.stateVec.imag[i] /= norm;
+	}
+}
+
+
+void evolveUnderPauliHamil(MultiQubit qubits, Hamiltonian pauliHamil, double timeStep, complex double* hamilState) {
+	
+	// load H |psi> into hamilState
+	applyHamil(hamilState, qubits, pauliHamil);
+	
+	// TODO
+}
+
+
+void evolveWavefunction(MultiQubit qubits, Hamiltonian hamil, double timeStep, complex double* hamilState) {
+	
+	if (hamil.type == DIAGONAL)
+		evolveUnderDiagHamil(qubits, hamil.diagHamil, timeStep);
+		
+	if (hamil.type == PAULI_TERMS) {
+		
+		printf("evolveWavefunction (true imaginary evolution) for Pauli Hamiltonians is not yet supported!!\n");
+		evolveUnderPauliHamil(qubits, hamil, timeStep, hamilState);
+		
 	}
 }

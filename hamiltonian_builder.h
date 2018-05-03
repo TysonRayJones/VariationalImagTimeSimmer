@@ -1,8 +1,8 @@
 #ifndef HAMILTONIAN_BUILDER_H_
 #define HAMILTONIAN_BUILDER_H_
 
+#include <QuEST.h>
 #include <complex.h>
-#include "QuEST/qubits.h"
 
 
 typedef enum {DIAGONAL, PAULI_TERMS} hamilType;

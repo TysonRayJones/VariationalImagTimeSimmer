@@ -29,7 +29,7 @@ USE_MPI=0
 USE_OPENMP=1
 
 # PATH TO QUEST LIBRARY SOURCES FROM ROOT DIRECTORY
-QUEST_DIR = ../QuEST
+QUEST_DIR = QuEST
 
 
 
@@ -96,21 +96,22 @@ endif
 # --- libraries
 #
 LIBS = -lm -lgsl -lgslcblas
+INCLUDE = -I$(QUEST_DIR)
 
 
 #
 # --- targets
 #
 USER_OBJ = $(addsuffix .o, $(MY_C_SOURCES))
-OBJ = qubits.o mt19937ar.o
+OBJ = QuEST.o mt19937ar.o
 OBJ += $(USER_OBJ)
 
 # Certain API functions have different implementations for MPI or non-MPI:
 # choose the right file
 ifneq ($(USE_MPI), 0)
-	OBJ += qubits_env_mpi.o
+	OBJ += QuEST_env_mpi.o
 else
-	OBJ += qubits_env_local.o
+	OBJ += QuEST_env_local.o
 endif
 
 
@@ -118,7 +119,7 @@ endif
 # --- rules
 #
 %.o: %.c
-	$(CC) $(CFLAGS) $(CFLAGS_OMP) -c $<
+	$(CC) $(INCLUDE) $(CFLAGS) $(CFLAGS_OMP) -c $<
 
 %.o: $(QUEST_DIR)/%.c
 	$(CC) $(CFLAGS) $(CFLAGS_OMP) -c $<
@@ -130,7 +131,7 @@ endif
 default:	$(EXE)
 
 $(EXE):		$(OBJ)
-		$(CC) $(CFLAGS) $(CFLAGS_OMP) -o $(EXE) $(OBJ) $(LIBS)
+		$(CC) $(INCLUDE) $(CFLAGS) $(CFLAGS_OMP) -o $(EXE) $(OBJ) $(LIBS)
 
 .PHONY:		clean veryclean
 clean:

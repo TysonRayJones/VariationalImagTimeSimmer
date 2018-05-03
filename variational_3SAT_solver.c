@@ -4,13 +4,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <QuEST.h>					// for simulating ansatz
 
 #include "hamiltonian_builder.h"	// for building and applying Hamiltonians
 #include "param_evolver.h"			// for variational imag-time simulation
 #include "true_evolver.h"			// for verifying variational sim
 #include "mmaformatter.h"			// for outputting results to mathematica
-
-#include "QuEST/qubits.h"			// for simulating the ansatz circuit
 
 
 #define OUTPUT_FILE "wickSATdata.txt"

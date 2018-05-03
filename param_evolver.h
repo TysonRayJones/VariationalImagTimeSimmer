@@ -1,6 +1,7 @@
 #ifndef PARAM_EVOLVER_H_
 #define PARAM_EVOLVER_H_
 
+#include <QuEST.h>
 #include <complex.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
@@ -8,8 +9,6 @@
 #include <gsl/gsl_multifit.h>
 
 #include "hamiltonian_builder.h"
-#include "QuEST/qubits.h"
-
 
 
 /**

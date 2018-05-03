@@ -2,14 +2,13 @@
  * Builds diagonal Hamiltonians from 3SAT problems
  */
 
+#include <QuEST.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <complex.h>
 
 #include "sat_generator.h"
-#include "QuEST/qubits.h"
- 
 #include "hamiltonian_builder.h"
  
 

@@ -6,6 +6,7 @@
 
 #define _USE_MATH_DEFINES
 
+#include <QuEST.h>
 #include <math.h>
 #include <complex.h>
 #include <stdlib.h>
@@ -15,7 +16,6 @@
 #include <gsl/gsl_multifit.h>
 
 #include "hamiltonian_builder.h"
-#include "QuEST/qubits.h"
 
 /** when approx'ing param change by TSVD, truncate SVs smaller than below*max */
 double DEFAULT_SVD_TOLERANCE = 0.01;
