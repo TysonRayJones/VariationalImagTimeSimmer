@@ -35,10 +35,10 @@ The parameters are updated by the method
 evolveOutcome evolveParams(
 	evolverMemory *mem, 
 	void (*ansatzCircuit)(MultiQubit, double*, int), 
-	int (*iinversionMethod)(evolverMemory*),
+	int (*inversionMethod)(evolverMemory*),
 	MultiQubit qubits, 
 	double* params, 
-	double* diagHamiltonian, 
+	Hamiltonian hamiltonian, 
 	double timeStepSize, 
 	int wrapParams
 );
@@ -69,6 +69,32 @@ The function must modify `mem->paramChange` (which is a GSL vector) using the `m
 In lieu of your own code, you can pass `approxByLUDecomp`, `approxParamsByLeastSquares`, `approxParamsByRemovingVar`, `approxParamsByTSVD` or `approxParamsByTikhonov`; see the code-doc in `param_evolver.h` for details. I recommend the latter, which ensures `||paramChange||` is small.
 
 Underdetermined equations of `paramChange` can be realised by changing `initStateZero` to `initStatePlus` in `defaultAnsatzCircuit`.
+
+---------
+`hamiltonian` must be an instance of `Hamiltonian`, declared in `hamiltonian_builder.c`, which you can construct via...
+
+```C
+Hamiltonian getRandom3SATHamil(int numBools, int **equ, int **sol, int *numClauses);
+```
+
+to generate a random 3SAT equation and accompanying diagonal Hamiltonian, or...
+
+```C
+Hamiltonian load3SATHamilFromFile(char *filename, int **equ, int **sol, int *numBools, int *numClauses);
+```
+
+to load a diagonal Hamiltonian from a 3SAT saved in a file, or...
+
+```C
+Hamiltonian loadPauliHamilFromFile(char *filename);
+```
+
+to load a Hamiltonian specified as a sum of pauli matrix products, with format
+```CSV
+coeff gateOnQubit1 gateOnQubit2 ... gateOnQubitN
+coeff gateOnQubit1 gateOnQubit2 ... gateOnQubitN
+```
+where `coeff` is a double, `gateOnQubitn` is one of `0,1,2,3`, signifying an `I,X,Y,Z` gate on that qubit.
 
 # Output
 
