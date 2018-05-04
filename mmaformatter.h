@@ -142,6 +142,20 @@ void writeNestedDoubleListToAssoc(
 );
 
 /**
+ * @brief adds a numDimensions-nested MMA array of sci-not numbers to the association
+ * @param file			file handle returned by openAssocWrite
+ * @param keyname		key to add to the association
+ * @param arr			nested array of doubles to convert to sci-not
+ * @param lengths		array of length of each dimension
+ * @param innerTrimLength	
+ * 						how many of each inner-most array to keep (to trim out place-holder data)
+ * @param precision	number of digits after decimal in sci-not
+ */
+void writeNestedDoubleArrToAssoc(
+	FILE* file, char* keyname, void* arr, int numDimensions, int* lengths, int innerTrimLength, int precision
+);
+
+/**
  * @brief formats and finalises the association, so it is ready
  * 		   to read by MMA's Get[filename] function
  * @param file	file handle returned by openAssocWrite

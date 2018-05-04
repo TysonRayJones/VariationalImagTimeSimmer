@@ -150,31 +150,22 @@ int main(int narg, char *varg[]) {
 	
 	
 	
-	
-	/* debug
-	 * 
-	 */
-	 
-	
-
-	
-	
-	
 	/*
 	 * PREPARE SIMULATION
 	 */
 	 
-	// TEST: 10qubit pauli file
+	/*
+	// testing chemistry Hamiltonian
 	Hamiltonian hamil = loadPauliHamilFromFile("hamtest.txt");
-	//printHamil(hamil);
+	printHamil(hamil);
 	
 	// monkeypatch
 	long long int solState = 0;
 	if (timeStep == 0)
 		timeStep = 0.01;
+	*/
 	
 	// generate a random 3SAT problem
-	/*
 	int *equ, *sol;
 	int numClauses;
 	Hamiltonian hamil = getRandom3SATHamil(numBools, &equ, &sol, &numClauses);
@@ -192,7 +183,6 @@ int main(int narg, char *varg[]) {
 	if (timeStep == 0)
 		timeStep = getStableTimeStep(hamil.diagHamil, pow(2, numBools));
 	printf("Time step: %lf\n", timeStep);
-	*/
 	
 	// prepare QuEST
 	QuESTEnv env;
@@ -207,7 +197,6 @@ int main(int narg, char *varg[]) {
 	double params[numParams];
 	for (int i=0; i < numParams; i++)
 		params[i] = (rand()/(double) RAND_MAX) * 2 * M_PI;
-	
 	
 	// remove energy degeneracy
 	/*
@@ -229,7 +218,7 @@ int main(int narg, char *varg[]) {
 		}
 	}
 	*/
-
+	
 	
 	
 	/*
@@ -251,7 +240,6 @@ int main(int narg, char *varg[]) {
 	}
 	
 	// analyse spectrum (only valid for diagonal hamiltonians)
-	/*
 	double* spectrum;
 	int* degeneracy;
 	int* stateToSpecMap;
@@ -272,7 +260,6 @@ int main(int narg, char *varg[]) {
 	for (long long int i=0LL; i < spectrumSize; i++)
 		for (int j=0; j < maxIterations; j++)
 			specProbEvo[i][j] = -666;
-	*/
 	
 	
 	/*
@@ -318,13 +305,11 @@ int main(int narg, char *varg[]) {
 			paramEvo[i][step] = params[i];
 			
 		// record spectrum evo data
-		/*
 		for (int i=0; i < spectrumSize; i++)
 			specProbEvo[i][step] = 0;
 		for (long long int i=0LL; i < qubits.numAmps; i++)
 			specProbEvo[stateToSpecMap[i]][step] += getProbEl(qubits, i);
-		*/
-			 
+		
 		
 		// randomly wiggle params
 		/*
@@ -357,28 +342,24 @@ int main(int narg, char *varg[]) {
 	writeDoubleToAssoc(file, "threshold", threshold, 20);
 	writeDoubleArrToAssoc(file, "solProbEvo", solProbEvo, step, 10);
 	writeDoubleArrToAssoc(file, "expectedEnergyEvo", expectedEnergyEvo, step, 10);
-	
-	// record evolution of every param
-	char buf[1024];
-	for (int p=0; p < numParams; p++) {
-		sprintf(buf, "param%dEvo", p);
-		writeDoubleArrToAssoc(file, buf, paramEvo[p], step, 10);
-	}
+	writeNestedDoubleArrToAssoc(file, "paramEvo", paramEvo, 2, (int []) {numParams, maxIterations}, step, 10);
 	
 	// record evolution of the spectrum
-	/*
 	writeIntToAssoc(file, "spectrumSize", spectrumSize);
 	writeDoubleArrToAssoc(file, "spectrum", spectrum, spectrumSize, 1);
 	writeIntArrToAssoc(file, "spectrumDegeneracy", degeneracy, spectrumSize);
 	writeIntToAssoc(file, "solStateSpecInd", solStateSpecInd);
-	for (int s=0; s < spectrumSize; s++) {
-		sprintf(buf, "spec%dEvo", s);
-		writeDoubleArrToAssoc(file, buf, specProbEvo[s], step, 10);
-	}
-	*/
+	writeNestedDoubleArrToAssoc(file, "specEvo", specProbEvo, 2, (int []) {spectrumSize, maxIterations}, step, 10);
 	
 	closeAssocWrite(file);
 	
+	
+	// DEBuG
+	for (int i=0; i < step; i++)
+		printf("%lf\n", paramEvo[0][i]);
+	printf("\n\n\n");
+	for (int i=0; i < step; i++)
+		printf("%lf\n", paramEvo[1][i]);
 	
 	
 	/*
@@ -388,13 +369,11 @@ int main(int narg, char *varg[]) {
 	// cleanup
 	freeEvolverMemory(&mem);
 	freeHamil(hamil);
-	/*
 	free(equ);
 	free(sol);
 	free(spectrum);
 	free(degeneracy);
 	free(stateToSpecMap);
-	*/
 	
 	// unload QuEST
 	destroyMultiQubit(qubits, env); 
