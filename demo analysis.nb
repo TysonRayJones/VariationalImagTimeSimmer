@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[     19584,        404]
-NotebookOptionsPosition[     18448,        378]
-NotebookOutlinePosition[     18810,        394]
-CellTagsIndexPosition[     18767,        391]
+NotebookDataLength[     11182,        259]
+NotebookOptionsPosition[     10247,        235]
+NotebookOutlinePosition[     10604,        251]
+CellTagsIndexPosition[     10561,        248]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -94,57 +94,48 @@ Cell[BoxData[
 
 Cell[CellGroupData[{
 
-Cell[BoxData[{
- RowBox[{
-  RowBox[{"Manipulate", "[", "\[IndentingNewLine]", "\t", 
-   RowBox[{
-    RowBox[{"ListLinePlot", "[", "\[IndentingNewLine]", "\t\t", 
-     RowBox[{
-      RowBox[{
-       RowBox[{"assoc", "[", "\"\<paramEvos\>\"", "]"}], "[", 
-       RowBox[{"[", "rep", "]"}], "]"}], ",", "\[IndentingNewLine]", "\t\t", 
-      RowBox[{"PlotLabel", "\[Rule]", " ", "\"\<parameters\>\""}]}], 
-     "\[IndentingNewLine]", "\t", "]"}], ",", "\[IndentingNewLine]", "\t", 
-    RowBox[{"{", 
-     RowBox[{"rep", ",", " ", 
-      RowBox[{"Range", " ", "@", " ", 
-       RowBox[{"assoc", "[", "\"\<simRepetitions\>\"", "]"}]}]}], "}"}]}], 
-   "\[IndentingNewLine]", "]"}], 
-  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"Manipulate", "[", "\[IndentingNewLine]", "\t", 
-   RowBox[{
-    RowBox[{"ListLinePlot", "[", "\[IndentingNewLine]", "\t\t", 
-     RowBox[{
-      RowBox[{
-       RowBox[{"assoc", "[", "\"\<solProbEvos\>\"", "]"}], "[", 
-       RowBox[{"[", "rep", "]"}], "]"}], ",", " ", "\[IndentingNewLine]", 
-      "\t\t", 
-      RowBox[{"PlotLabel", "\[Rule]", " ", "\"\<Prob(sol)\>\""}]}], 
-     "\[IndentingNewLine]", "\t", "]"}], ",", "\[IndentingNewLine]", "\t", 
-    RowBox[{"{", 
-     RowBox[{"rep", ",", " ", 
-      RowBox[{"Range", " ", "@", " ", 
-       RowBox[{"assoc", "[", "\"\<simRepetitions\>\"", "]"}]}]}], "}"}]}], 
-   "\[IndentingNewLine]", "]"}], 
-  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+Cell[BoxData[
  RowBox[{"Manipulate", "[", "\[IndentingNewLine]", "\t", 
   RowBox[{
-   RowBox[{"ListLinePlot", "[", "\[IndentingNewLine]", "\t\t", 
-    RowBox[{
+   RowBox[{"Column", " ", "@", " ", 
+    RowBox[{"{", "\[IndentingNewLine]", "\t\t", 
      RowBox[{
-      RowBox[{"assoc", "[", "\"\<expectedEnergyEvos\>\"", "]"}], "[", 
-      RowBox[{"[", "rep", "]"}], "]"}], ",", " ", "\[IndentingNewLine]", 
-     "\t\t", 
-     RowBox[{"PlotLabel", " ", "\[Rule]", " ", "\"\<<E>\>\""}], ",", 
-     "\[IndentingNewLine]", "\t\t", 
-     RowBox[{"PlotRange", "\[Rule]", " ", "All"}]}], "\[IndentingNewLine]", 
-    "\t", "]"}], ",", "\[IndentingNewLine]", "\t", 
+      RowBox[{"ListLinePlot", "[", "\[IndentingNewLine]", "\t\t\t", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"assoc", "[", "\"\<paramEvos\>\"", "]"}], "[", 
+         RowBox[{"[", "rep", "]"}], "]"}], ",", "\[IndentingNewLine]", 
+        "\t\t\t", 
+        RowBox[{"PlotLabel", "\[Rule]", " ", "\"\<parameters\>\""}]}], 
+       "\[IndentingNewLine]", "\t\t", "]"}], ",", "\[IndentingNewLine]", 
+      "\t\t", 
+      RowBox[{"ListLinePlot", "[", "\[IndentingNewLine]", "\t\t\t", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"assoc", "[", "\"\<solProbEvos\>\"", "]"}], "[", 
+         RowBox[{"[", "rep", "]"}], "]"}], ",", " ", "\[IndentingNewLine]", 
+        "\t\t\t", 
+        RowBox[{"PlotLabel", "\[Rule]", " ", "\"\<Prob(sol)\>\""}]}], 
+       "\[IndentingNewLine]", "\t\t", "]"}], ",", "\[IndentingNewLine]", 
+      "\t\t", 
+      RowBox[{"ListLinePlot", "[", "\[IndentingNewLine]", "\t\t\t", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"assoc", "[", "\"\<expectedEnergyEvos\>\"", "]"}], "[", 
+         RowBox[{"[", "rep", "]"}], "]"}], ",", " ", "\[IndentingNewLine]", 
+        "\t\t\t", 
+        RowBox[{"PlotLabel", " ", "\[Rule]", " ", "\"\<<E>\>\""}], ",", 
+        "\[IndentingNewLine]", "\t\t\t", 
+        RowBox[{"PlotRange", "\[Rule]", " ", "All"}]}], "\[IndentingNewLine]",
+        "\t\t", "]"}]}], "\[IndentingNewLine]", "\t", "}"}]}], ",", 
+   "\[IndentingNewLine]", "\t", 
    RowBox[{"{", 
     RowBox[{"rep", ",", " ", 
      RowBox[{"Range", " ", "@", " ", 
-      RowBox[{"assoc", "[", "\"\<simRepetitions\>\"", "]"}]}]}], "}"}]}], 
-  "\[IndentingNewLine]", "]"}]}], "Input",
+      RowBox[{"assoc", "[", "\"\<simRepetitions\>\"", "]"}]}]}], "}"}], ",", 
+   "\[IndentingNewLine]", "\t", 
+   RowBox[{"Paneled", "\[Rule]", " ", "False"}]}], "\[IndentingNewLine]", 
+  "]"}]], "Input",
  CellChangeTimes->{{3.7327903464939003`*^9, 3.7327905218553658`*^9}, {
    3.73279142988992*^9, 3.732791430695842*^9}, 3.732791577756206*^9, {
    3.7327917954517183`*^9, 3.7327918033567257`*^9}, {3.732793952124391*^9, 
@@ -152,35 +143,46 @@ Cell[BoxData[{
    3.7343728021732273`*^9, 3.734372829715333*^9}, {3.734442279326179*^9, 
    3.734442362397458*^9}, {3.7344427919409723`*^9, 3.734442811912607*^9}, {
    3.734699568097187*^9, 3.73469963931054*^9}, {3.734699675559827*^9, 
-   3.7346996991504917`*^9}, {3.734702211205324*^9, 
-   3.734702238165264*^9}},ExpressionUUID->"2a1be25d-f530-4e17-bc04-\
+   3.7346996991504917`*^9}, {3.734702211205324*^9, 3.734702238165264*^9}, {
+   3.734709227048356*^9, 3.7347093154366903`*^9}, {3.734709360124855*^9, 
+   3.7347093609016857`*^9}},ExpressionUUID->"2a1be25d-f530-4e17-bc04-\
 6e4ef882e744"],
 
 Cell[BoxData[
  TagBox[
   StyleBox[
-   DynamicModuleBox[{$CellContext`rep$$ = 1, Typeset`show$$ = True, 
+   DynamicModuleBox[{$CellContext`rep$$ = 5, Typeset`show$$ = True, 
     Typeset`bookmarkList$$ = {}, Typeset`bookmarkMode$$ = "Menu", 
     Typeset`animator$$, Typeset`animvar$$ = 1, Typeset`name$$ = 
     "\"untitled\"", Typeset`specs$$ = {{
       Hold[$CellContext`rep$$], {1, 2, 3, 4, 5}}}, Typeset`size$$ = {
-    360., {116., 120.}}, Typeset`update$$ = 0, Typeset`initDone$$, 
-    Typeset`skipInitDone$$ = True, $CellContext`rep$9210$$ = 0}, 
+    180., {196.634033203125, 202.365966796875}}, Typeset`update$$ = 0, 
+    Typeset`initDone$$, Typeset`skipInitDone$$ = 
+    True, $CellContext`rep$11625$$ = 0}, 
     DynamicBox[Manipulate`ManipulateBoxes[
      1, StandardForm, "Variables" :> {$CellContext`rep$$ = 1}, 
       "ControllerVariables" :> {
-        Hold[$CellContext`rep$$, $CellContext`rep$9210$$, 0]}, 
+        Hold[$CellContext`rep$$, $CellContext`rep$11625$$, 0]}, 
       "OtherVariables" :> {
        Typeset`show$$, Typeset`bookmarkList$$, Typeset`bookmarkMode$$, 
         Typeset`animator$$, Typeset`animvar$$, Typeset`name$$, 
         Typeset`specs$$, Typeset`size$$, Typeset`update$$, Typeset`initDone$$,
-         Typeset`skipInitDone$$}, "Body" :> ListLinePlot[
-        Part[
-         $CellContext`assoc["paramEvos"], $CellContext`rep$$], PlotLabel -> 
-        "parameters"], 
+         Typeset`skipInitDone$$}, "Body" :> Column[{
+         ListLinePlot[
+          Part[
+           $CellContext`assoc["paramEvos"], $CellContext`rep$$], PlotLabel -> 
+          "parameters"], 
+         ListLinePlot[
+          Part[
+           $CellContext`assoc["solProbEvos"], $CellContext`rep$$], PlotLabel -> 
+          "Prob(sol)"], 
+         ListLinePlot[
+          Part[
+           $CellContext`assoc["expectedEnergyEvos"], $CellContext`rep$$], 
+          PlotLabel -> "<E>", PlotRange -> All]}], 
       "Specifications" :> {{$CellContext`rep$$, {1, 2, 3, 4, 5}}}, 
-      "Options" :> {}, "DefaultOptions" :> {}],
-     ImageSizeCache->{405., {159., 165.}},
+      "Options" :> {Paneled -> False}, "DefaultOptions" :> {}],
+     ImageSizeCache->{200., {233., 238.}},
      SingleEvaluation->True],
     Deinitialization:>None,
     DynamicModuleValues:>{},
@@ -226,158 +228,13 @@ Cell[BoxData[
    3.734598594205676*^9, {3.7346995693945303`*^9, 3.734699602163671*^9}, {
    3.734699681958374*^9, 3.73469969944979*^9}, 3.734702099642172*^9, {
    3.7347022286878157`*^9, 3.734702238560444*^9}, 3.734702973502118*^9, 
-   3.734703045264419*^9},ExpressionUUID->"5fba25ac-e123-4c5a-9d87-\
-fcbc27410d44"],
-
-Cell[BoxData[
- TagBox[
-  StyleBox[
-   DynamicModuleBox[{$CellContext`rep$$ = 1, Typeset`show$$ = True, 
-    Typeset`bookmarkList$$ = {}, Typeset`bookmarkMode$$ = "Menu", 
-    Typeset`animator$$, Typeset`animvar$$ = 1, Typeset`name$$ = 
-    "\"untitled\"", Typeset`specs$$ = {{
-      Hold[$CellContext`rep$$], {1, 2, 3, 4, 5}}}, Typeset`size$$ = {
-    360., {119., 123.}}, Typeset`update$$ = 0, Typeset`initDone$$, 
-    Typeset`skipInitDone$$ = True, $CellContext`rep$9232$$ = 0}, 
-    DynamicBox[Manipulate`ManipulateBoxes[
-     1, StandardForm, "Variables" :> {$CellContext`rep$$ = 1}, 
-      "ControllerVariables" :> {
-        Hold[$CellContext`rep$$, $CellContext`rep$9232$$, 0]}, 
-      "OtherVariables" :> {
-       Typeset`show$$, Typeset`bookmarkList$$, Typeset`bookmarkMode$$, 
-        Typeset`animator$$, Typeset`animvar$$, Typeset`name$$, 
-        Typeset`specs$$, Typeset`size$$, Typeset`update$$, Typeset`initDone$$,
-         Typeset`skipInitDone$$}, "Body" :> ListLinePlot[
-        Part[
-         $CellContext`assoc["solProbEvos"], $CellContext`rep$$], PlotLabel -> 
-        "Prob(sol)"], 
-      "Specifications" :> {{$CellContext`rep$$, {1, 2, 3, 4, 5}}}, 
-      "Options" :> {}, "DefaultOptions" :> {}],
-     ImageSizeCache->{405., {162., 168.}},
-     SingleEvaluation->True],
-    Deinitialization:>None,
-    DynamicModuleValues:>{},
-    SynchronousInitialization->True,
-    UndoTrackedVariables:>{Typeset`show$$, Typeset`bookmarkMode$$},
-    UnsavedVariables:>{Typeset`initDone$$},
-    UntrackedVariables:>{Typeset`size$$}], "Manipulate",
-   Deployed->True,
-   StripOnInput->False],
-  Manipulate`InterpretManipulate[1]]], "Output",
- CellChangeTimes->{
-  3.7332067042636642`*^9, 3.733206839058997*^9, 3.7332074763510437`*^9, 
-   3.7332076009915457`*^9, 3.7332077480295677`*^9, 3.733207812368627*^9, {
-   3.7332078646443157`*^9, 3.733207880543998*^9}, 3.733207913092574*^9, {
-   3.733210002185009*^9, 3.733210009879793*^9}, 3.7332109468330393`*^9, 
-   3.73321156358315*^9, {3.7332116477560797`*^9, 3.733211663963975*^9}, 
-   3.733211733735402*^9, 3.733211764855547*^9, 3.7332118028698*^9, {
-   3.733211905568286*^9, 3.733211933572892*^9}, {3.733211971637595*^9, 
-   3.733211987838703*^9}, {3.733225381215019*^9, 3.73322540513274*^9}, 
-   3.733225446951139*^9, 3.733225526184218*^9, 3.733225606014179*^9, 
-   3.733225684107828*^9, 3.733226279317812*^9, 3.733226322151087*^9, 
-   3.733226378271048*^9, 3.733226488756691*^9, 3.733226550499194*^9, 
-   3.7332266143658257`*^9, 3.733226679494952*^9, 3.733226711723119*^9, 
-   3.733226750101119*^9, 3.733226817723743*^9, 3.733226863921843*^9, {
-   3.733226899980811*^9, 3.733226948421956*^9}, {3.7332271408720922`*^9, 
-   3.7332271694656143`*^9}, 3.733227238411639*^9, {3.733227347524613*^9, 
-   3.733227401717949*^9}, 3.733228073628016*^9, 3.733228123630747*^9, 
-   3.733228178438517*^9, 3.733228222137504*^9, 3.7332284339943657`*^9, {
-   3.733228899724598*^9, 3.733228922088708*^9}, 3.733229003562202*^9, {
-   3.73322919669339*^9, 3.733229221039794*^9}, 3.733229339779297*^9, 
-   3.73322943167944*^9, 3.733229505658821*^9, 3.733229572089057*^9, 
-   3.733229712158688*^9, {3.733229768333256*^9, 3.733229793609836*^9}, {
-   3.733229834045443*^9, 3.733229856284771*^9}, 3.733229898433486*^9, 
-   3.733230069033123*^9, 3.73323033062669*^9, 3.7332304355546417`*^9, 
-   3.7332305287674017`*^9, 3.733230568079894*^9, 3.733230598518179*^9, 
-   3.733231240808387*^9, 3.733231387704707*^9, {3.7332314347984962`*^9, 
-   3.733231463026784*^9}, 3.733231564569529*^9, 3.733231629936618*^9, {
-   3.734372810910199*^9, 3.73437285629902*^9}, {3.734373171323045*^9, 
-   3.734373172093863*^9}, 3.734442274470965*^9, {3.7344423117956333`*^9, 
-   3.734442362770217*^9}, {3.734442793168181*^9, 3.734442812679763*^9}, 
-   3.734517113301497*^9, 3.734517211045179*^9, 3.7345175053950233`*^9, {
-   3.7345982050987597`*^9, 3.7345982226661787`*^9}, 3.734598277822321*^9, 
-   3.734598594205676*^9, {3.7346995693945303`*^9, 3.734699602163671*^9}, {
-   3.734699681958374*^9, 3.73469969944979*^9}, 3.734702099642172*^9, {
-   3.7347022286878157`*^9, 3.734702238560444*^9}, 3.734702973502118*^9, 
-   3.734703045383894*^9},ExpressionUUID->"a2cda66f-1588-45e0-b4ce-\
-fc66425b814c"],
-
-Cell[BoxData[
- TagBox[
-  StyleBox[
-   DynamicModuleBox[{$CellContext`rep$$ = 1, Typeset`show$$ = True, 
-    Typeset`bookmarkList$$ = {}, Typeset`bookmarkMode$$ = "Menu", 
-    Typeset`animator$$, Typeset`animvar$$ = 1, Typeset`name$$ = 
-    "\"untitled\"", Typeset`specs$$ = {{
-      Hold[$CellContext`rep$$], {1, 2, 3, 4, 5}}}, Typeset`size$$ = {
-    360., {119., 123.}}, Typeset`update$$ = 0, Typeset`initDone$$, 
-    Typeset`skipInitDone$$ = True, $CellContext`rep$9305$$ = 0}, 
-    DynamicBox[Manipulate`ManipulateBoxes[
-     1, StandardForm, "Variables" :> {$CellContext`rep$$ = 1}, 
-      "ControllerVariables" :> {
-        Hold[$CellContext`rep$$, $CellContext`rep$9305$$, 0]}, 
-      "OtherVariables" :> {
-       Typeset`show$$, Typeset`bookmarkList$$, Typeset`bookmarkMode$$, 
-        Typeset`animator$$, Typeset`animvar$$, Typeset`name$$, 
-        Typeset`specs$$, Typeset`size$$, Typeset`update$$, Typeset`initDone$$,
-         Typeset`skipInitDone$$}, "Body" :> ListLinePlot[
-        Part[
-         $CellContext`assoc["expectedEnergyEvos"], $CellContext`rep$$], 
-        PlotLabel -> "<E>", PlotRange -> All], 
-      "Specifications" :> {{$CellContext`rep$$, {1, 2, 3, 4, 5}}}, 
-      "Options" :> {}, "DefaultOptions" :> {}],
-     ImageSizeCache->{405., {162., 168.}},
-     SingleEvaluation->True],
-    Deinitialization:>None,
-    DynamicModuleValues:>{},
-    SynchronousInitialization->True,
-    UndoTrackedVariables:>{Typeset`show$$, Typeset`bookmarkMode$$},
-    UnsavedVariables:>{Typeset`initDone$$},
-    UntrackedVariables:>{Typeset`size$$}], "Manipulate",
-   Deployed->True,
-   StripOnInput->False],
-  Manipulate`InterpretManipulate[1]]], "Output",
- CellChangeTimes->{
-  3.7332067042636642`*^9, 3.733206839058997*^9, 3.7332074763510437`*^9, 
-   3.7332076009915457`*^9, 3.7332077480295677`*^9, 3.733207812368627*^9, {
-   3.7332078646443157`*^9, 3.733207880543998*^9}, 3.733207913092574*^9, {
-   3.733210002185009*^9, 3.733210009879793*^9}, 3.7332109468330393`*^9, 
-   3.73321156358315*^9, {3.7332116477560797`*^9, 3.733211663963975*^9}, 
-   3.733211733735402*^9, 3.733211764855547*^9, 3.7332118028698*^9, {
-   3.733211905568286*^9, 3.733211933572892*^9}, {3.733211971637595*^9, 
-   3.733211987838703*^9}, {3.733225381215019*^9, 3.73322540513274*^9}, 
-   3.733225446951139*^9, 3.733225526184218*^9, 3.733225606014179*^9, 
-   3.733225684107828*^9, 3.733226279317812*^9, 3.733226322151087*^9, 
-   3.733226378271048*^9, 3.733226488756691*^9, 3.733226550499194*^9, 
-   3.7332266143658257`*^9, 3.733226679494952*^9, 3.733226711723119*^9, 
-   3.733226750101119*^9, 3.733226817723743*^9, 3.733226863921843*^9, {
-   3.733226899980811*^9, 3.733226948421956*^9}, {3.7332271408720922`*^9, 
-   3.7332271694656143`*^9}, 3.733227238411639*^9, {3.733227347524613*^9, 
-   3.733227401717949*^9}, 3.733228073628016*^9, 3.733228123630747*^9, 
-   3.733228178438517*^9, 3.733228222137504*^9, 3.7332284339943657`*^9, {
-   3.733228899724598*^9, 3.733228922088708*^9}, 3.733229003562202*^9, {
-   3.73322919669339*^9, 3.733229221039794*^9}, 3.733229339779297*^9, 
-   3.73322943167944*^9, 3.733229505658821*^9, 3.733229572089057*^9, 
-   3.733229712158688*^9, {3.733229768333256*^9, 3.733229793609836*^9}, {
-   3.733229834045443*^9, 3.733229856284771*^9}, 3.733229898433486*^9, 
-   3.733230069033123*^9, 3.73323033062669*^9, 3.7332304355546417`*^9, 
-   3.7332305287674017`*^9, 3.733230568079894*^9, 3.733230598518179*^9, 
-   3.733231240808387*^9, 3.733231387704707*^9, {3.7332314347984962`*^9, 
-   3.733231463026784*^9}, 3.733231564569529*^9, 3.733231629936618*^9, {
-   3.734372810910199*^9, 3.73437285629902*^9}, {3.734373171323045*^9, 
-   3.734373172093863*^9}, 3.734442274470965*^9, {3.7344423117956333`*^9, 
-   3.734442362770217*^9}, {3.734442793168181*^9, 3.734442812679763*^9}, 
-   3.734517113301497*^9, 3.734517211045179*^9, 3.7345175053950233`*^9, {
-   3.7345982050987597`*^9, 3.7345982226661787`*^9}, 3.734598277822321*^9, 
-   3.734598594205676*^9, {3.7346995693945303`*^9, 3.734699602163671*^9}, {
-   3.734699681958374*^9, 3.73469969944979*^9}, 3.734702099642172*^9, {
-   3.7347022286878157`*^9, 3.734702238560444*^9}, 3.734702973502118*^9, 
-   3.734703045423148*^9},ExpressionUUID->"1165f163-d6f8-480f-85fd-\
-8937a1859669"]
+   3.734703045264419*^9, {3.734709277102603*^9, 3.734709284169168*^9}, 
+   3.73470936140333*^9},ExpressionUUID->"8edace42-7890-49d4-8e9f-\
+5d08945ac9f9"]
 }, Open  ]]
 },
-WindowSize->{960, 1035},
-WindowMargins->{{Automatic, -2880}, {Automatic, 0}},
+WindowSize->{960, 775},
+WindowMargins->{{0, Automatic}, {Automatic, 0}},
 FrontEndVersion->"11.2 for Mac OS X x86 (32-bit, 64-bit Kernel) (September \
 10, 2017)",
 StyleDefinitions->"Default.nb"
@@ -401,10 +258,8 @@ Cell[1192, 42, 334, 7, 30, "Input",ExpressionUUID->"3d768e4b-2527-4651-aac1-0ef0
 Cell[1529, 51, 1372, 40, 366, "Output",ExpressionUUID->"ca71609c-3b31-4d09-97df-0210dfd99c16"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[2938, 96, 2858, 60, 514, "Input",ExpressionUUID->"2a1be25d-f530-4e17-bc04-6e4ef882e744"],
-Cell[5799, 158, 4202, 71, 343, "Output",ExpressionUUID->"5fba25ac-e123-4c5a-9d87-fcbc27410d44"],
-Cell[10004, 231, 4203, 71, 349, "Output",ExpressionUUID->"a2cda66f-1588-45e0-b4ce-fc66425b814c"],
-Cell[14210, 304, 4222, 71, 349, "Output",ExpressionUUID->"1165f163-d6f8-480f-85fd-8937a1859669"]
+Cell[2938, 96, 2635, 52, 409, "Input",ExpressionUUID->"2a1be25d-f530-4e17-bc04-6e4ef882e744"],
+Cell[5576, 150, 4655, 82, 490, "Output",ExpressionUUID->"8edace42-7890-49d4-8e9f-5d08945ac9f9"]
 }, Open  ]]
 }
 ]
