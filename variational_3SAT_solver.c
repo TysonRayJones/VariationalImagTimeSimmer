@@ -63,8 +63,18 @@ void initStateRandom(MultiQubit *qubits) {
 
 
 void getSpectrum(
-	double *hamil, long long int hamilSize, 
+	Hamiltonian hamilObj, long long int hamilSize, 
 	double** spectrum, int** degeneracy, int** stateToSpecMap, long long int* spectrumSize) {
+		
+	// monkey-patch: abort for non-diagonal Hamiltonians
+	if (hamilObj.type != DIAGONAL) {
+		printf("Spectrum analysis skipped for non-diagonal Hamiltonian.\n");
+		*spectrumSize=0;
+		return;
+	}
+		
+		
+	double *hamil = hamilObj.diagHamil;
 	
 	// collect all energies, pops in roomy arrays
 	*spectrumSize = 0;
@@ -114,22 +124,23 @@ int main(int narg, char *varg[]) {
 	 * GET CMD ARGS 
 	 */
 	 	 
-	if (narg != 10) {
+	if (narg != 11) {
 		printf("ERROR! Call with arguments:\n");
-		printf("num_bools\nnum_params\nrseed\nthreshold[0 to 1]\ntimestep[0 for auto]\nmax_iters\nwrap_params\n");
-		printf("deriv_accuracy[1 to 4]\nmatrix_noise[0 to 1]\n");
+		printf("num_bools\nnum_params\nrseed\ntimestep[0 for auto]\nmax_iters\nwrap_params\n");
+		printf("deriv_accuracy[1 to 4]\nmatrix_noise[0 to 1]\nsim_reps\nprint_progress_every\n");
 		return 1;
 	}
 	
 	int numBools = atoi(varg[1]);
 	int numParams = atoi(varg[2]);
 	srand(atoi(varg[3]));
-	double threshold; sscanf(varg[4], "%lf", &threshold);
-	double timeStep; sscanf(varg[5], "%lf", &timeStep);
-	int maxIterations = atoi(varg[6]);
-	int wrapParams = atoi(varg[7]);
-	int derivAccuracy = atoi(varg[8]);
-	double matrNoise; sscanf(varg[9], "%lf", &matrNoise);
+	double timeStep; sscanf(varg[4], "%lf", &timeStep);
+	int maxIterations = atoi(varg[5]);
+	int wrapParams = atoi(varg[6]);
+	int derivAccuracy = atoi(varg[7]);
+	double matrNoise; sscanf(varg[8], "%lf", &matrNoise);
+	int simRepetitions = atoi(varg[9]);
+	int progressPrintFrequency = atoi(varg[10]);
 	
 	if (numBools < 4) {
 		printf("ERROR! Minimum num_bools is 4\n");
@@ -139,24 +150,29 @@ int main(int narg, char *varg[]) {
 		printf("ERROR! Minimum num_params is 1\n");
 		return 1;
 	}
-	if (threshold <= 0 || threshold >= 1) {
-		printf("ERROR! Threshold must be in (0, 1)\n");
-		return 1;
-	}
 	if (timeStep < 0) {
-		printf("ERROR! time_step must be positive or 0 for auto");
+		printf("ERROR! time_step must be positive or 0 for auto\n");
 		return 1;
 	}
+	if (simRepetitions < 1) {
+		printf("ERROR! sim_reps must be greater than 0\n");
+		return 1;
+	}
+	if (progressPrintFrequency < 0) {
+		printf("ERROR! print_progress_every must be greater than 0 (1 for every iteration)\n");
+	}
+	
+	printf("THE TRESHOLD IS NOW BEING IGNORED!!!\n\n");
 	
 	
 	
 	/*
 	 * PREPARE SIMULATION
 	 */
-	 
-	/*
+	
 	// testing chemistry Hamiltonian
-	Hamiltonian hamil = loadPauliHamilFromFile("hamtest.txt");
+	/*
+	Hamiltonian hamil = loadPauliHamilFromFile("hamtest6qb.txt");
 	printHamil(hamil);
 	
 	// monkeypatch
@@ -164,6 +180,7 @@ int main(int narg, char *varg[]) {
 	if (timeStep == 0)
 		timeStep = 0.01;
 	*/
+	
 	
 	// generate a random 3SAT problem
 	int *equ, *sol;
@@ -180,9 +197,10 @@ int main(int narg, char *varg[]) {
 	printf("\nsol ind:\n%d\n\n", solState);
 	
 	// choose a sufficiently small time-step
-	if (timeStep == 0)
+	if (timeStep == 0 && hamil.type == DIAGONAL)
 		timeStep = getStableTimeStep(hamil.diagHamil, pow(2, numBools));
 	printf("Time step: %lf\n", timeStep);
+	
 	
 	// prepare QuEST
 	QuESTEnv env;
@@ -192,11 +210,6 @@ int main(int narg, char *varg[]) {
 	
 	// prepare the param evolver
 	EvolverMemory mem = prepareEvolverMemory(qubits, numParams);
-	
-	// set initial param values
-	double params[numParams];
-	for (int i=0; i < numParams; i++)
-		params[i] = (rand()/(double) RAND_MAX) * 2 * M_PI;
 	
 	// remove energy degeneracy
 	/*
@@ -226,18 +239,23 @@ int main(int narg, char *varg[]) {
 	 */
 	
 	// prepare records of param values
-	double paramEvo[numParams][maxIterations];
-	for (int i=0; i < numParams; i++)
-		for (int j=0; j < maxIterations; j++)
-			paramEvo[i][j] = -666;
+	double paramEvo[simRepetitions][numParams][maxIterations];
+	for (int i=0; i < simRepetitions; i++)
+		for (int j=0; j < numParams; j++)
+			for (int k=0; k < maxIterations; k++)
+				paramEvo[i][j][k] = -666;
 	
-	// prepare records of sol prob and expected energy
-	double solProbEvo[maxIterations];
-	double expectedEnergyEvo[maxIterations];
-	for (int i=0; i < maxIterations; i++) {
-		solProbEvo[i] = -1;
-		expectedEnergyEvo[i] = -1;
-	}
+	// prepare records expected energy...
+	double expectedEnergyEvo[simRepetitions][maxIterations];
+	for (int s=0; s < simRepetitions; s++)
+		for (int i=0; i < maxIterations; i++)
+			expectedEnergyEvo[s][i] = -1;
+	
+	// and solution prob (only relevant for DIAGONAL Hamiltonians)
+	double solProbEvo[simRepetitions][maxIterations];
+	for (int s=0; s < simRepetitions; s++)
+		for (int i=0; i < maxIterations; i++)
+			solProbEvo[s][i] = -1;
 	
 	// analyse spectrum (only valid for diagonal hamiltonians)
 	double* spectrum;
@@ -245,138 +263,166 @@ int main(int narg, char *varg[]) {
 	int* stateToSpecMap;
 	long long int spectrumSize;
 	long long int solStateSpecInd = 0;
-	getSpectrum(hamil.diagHamil, qubits.numAmps, &spectrum, &degeneracy, &stateToSpecMap, &spectrumSize);
-	
-	printf("\nSpectrum size:\t%lld\n", spectrumSize);
-	for (long long int i=0LL; i < spectrumSize; i++)
-		printf("energy:\t%lf,\tdegeneracy:\t%d\n", spectrum[i], degeneracy[i]);
-	for (long long int i=0LL; i < spectrumSize; i++)
-		if (spectrum[i] == 0)
-			solStateSpecInd = i;
-	printf("spectrum[%lld] = 0\n\n", solStateSpecInd);
-	
-	// prepare records of spectrum evolution
-	double specProbEvo[spectrumSize][maxIterations];
-	for (long long int i=0LL; i < spectrumSize; i++)
-		for (int j=0; j < maxIterations; j++)
-			specProbEvo[i][j] = -666;
-	
-	
-	/*
-	 * PERFORM SIMULATION
-	 */
-	
-	evolveOutcome outcome;
-	int step=0;
-	double prob = 0;
-	double energy = 0;
-	
-	// set the state we'll feed into the ansatz
-	initStateZero(&qubits);
-	setAnsatzInitState(&mem, qubits);
-	
-	defaultAnsatzCircuit(&mem, qubits, params, numParams);
-	
-	// keep evolving until we converge or reach max iterations
-	while (step < maxIterations && prob < threshold ) {
+	getSpectrum(
+		hamil, qubits.numAmps, 
+		&spectrum, &degeneracy, &stateToSpecMap, &spectrumSize
+	);
+	double specProbEvo[simRepetitions][spectrumSize][maxIterations];
 		
-		// update params under parameterised evolution
-		outcome = evolveParams(
-			&mem, defaultAnsatzCircuit, approxParamsByTikhonov,
-			qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
-			
-		if (outcome == FAILED) {
-			printf("Numerical inversion failed! Aborting entire sim!\n");
-			return 1;
-		}
+	if (hamil.type == DIAGONAL) {
+		printf("\nSpectrum size:\t%lld\n", spectrumSize);
+		for (long long int i=0LL; i < spectrumSize; i++)
+			printf("energy:\t%lf,\tdegeneracy:\t%d\n", spectrum[i], degeneracy[i]);
+		for (long long int i=0LL; i < spectrumSize; i++)
+			if (spectrum[i] == 0)
+				solStateSpecInd = i;
+		printf("spectrum[%lld] = 0\n\n", solStateSpecInd);
 		
-		// update params under exact evolution
-		//evolveWavefunction(qubits, hamil, timeStep);
-		
-		// monitor convergence
-		prob = getProbEl(qubits, solState);
-		energy = getExpectedEnergy(mem.hamilState, qubits, hamil);
-		printf("t%d: \t prob(sol) = %f \t <E> = %f\n", step, prob, energy);
-		
-		// record param evo data
-		solProbEvo[step] = prob;
-		expectedEnergyEvo[step] = energy;
-		for (int i=0; i < numParams; i++)
-			paramEvo[i][step] = params[i];
-			
-		// record spectrum evo data
-		for (int i=0; i < spectrumSize; i++)
-			specProbEvo[i][step] = 0;
-		for (long long int i=0LL; i < qubits.numAmps; i++)
-			specProbEvo[stateToSpecMap[i]][step] += getProbEl(qubits, i);
-		
-		
-		// randomly wiggle params
-		/*
-		if (step > 0 && step % 50 == 0) {
-			printf("Wiggling params!");
-			
-			for (int i=0; i < numParams; i++)
-				params[i] += 0.01 * 2*M_PI*(rand() / (double) RAND_MAX);
-		}
-		*/
-		
-		step += 1;
+		// prepare records of spectrum evolution
+		for (int r=0; r < simRepetitions; r++)
+			for (long long int i=0LL; i < spectrumSize; i++)
+				for (int j=0; j < maxIterations; j++)
+					specProbEvo[r][i][j] = -666;
 	}
 	
 	
 	
 	/*
+	 * PERFORM SIMULATION
+	 */
+		
+	// set the state we'll feed into the ansatz
+	initStateZero(&qubits);
+	setAnsatzInitState(&mem, qubits);
+	
+	evolveOutcome outcome;
+	int step;
+	double prob;
+	double energy;
+	
+	// re-simulate many times
+	for (int rep=0; rep < simRepetitions; rep++) {
+		step = 0;
+	
+		// set random initial param values
+		double params[numParams];
+		for (int i=0; i < numParams; i++)
+			params[i] = (rand()/(double) RAND_MAX) * 2 * M_PI;
+		
+		// keep evolving until we converge or reach max iterations
+		while (step < maxIterations) {
+			
+			// update params under parameterised evolution
+			outcome = evolveParams(
+				&mem, defaultAnsatzCircuit, approxParamsByTikhonov,
+				qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
+			
+			if (outcome == FAILED) {
+				printf("Numerical inversion failed! Aborting entire sim!\n");
+				return 1;
+			}
+			
+			// update params under exact evolution
+			//evolveWavefunction(qubits, hamil, timeStep);
+			
+			// monitor convergence
+			prob = getProbEl(qubits, solState);
+			energy = getExpectedEnergy(mem.hamilState, qubits, hamil);
+			if (step % progressPrintFrequency == 0)
+				printf("t%d: \t prob(sol) = %f \t <E> = %f\n", step, prob, energy);
+			
+			// record param evo data
+			solProbEvo[rep][step] = prob;
+			expectedEnergyEvo[rep][step] = energy;
+			for (int i=0; i < numParams; i++)
+				paramEvo[rep][i][step] = params[i];
+				
+			// record spectrum evo data
+			if (hamil.type == DIAGONAL) {
+				for (int i=0; i < spectrumSize; i++)
+					specProbEvo[rep][i][step] = 0;
+				for (long long int i=0LL; i < qubits.numAmps; i++)
+					specProbEvo[rep][stateToSpecMap[i]][step] += getProbEl(qubits, i);
+			}
+			
+			
+			// randomly wiggle params
+			/*
+			if (step > 0 && step % 50 == 0) {
+				printf("Wiggling params!");
+				
+				for (int i=0; i < numParams; i++)
+					params[i] += 0.01 * 2*M_PI*(rand() / (double) RAND_MAX);
+			}
+			*/
+			
+			step += 1;
+		}
+	
+	
+	}
+	
+
+	
+	/*
 	 * SAVE RESULTS TO FILE
 	 */
 	
-	// record <E>, prob evolutions, recovered iterations
+	// record results
 	FILE* file = openAssocWrite(OUTPUT_FILE);
-	writeIntToAssoc(file, "numIterations", step);
+	
+	// meta-data
+	writeIntToAssoc(file, "simRepetitions", simRepetitions);
+	writeIntToAssoc(file, "maxIterations", maxIterations);
 	writeIntToAssoc(file, "derivAccuracy", derivAccuracy);
 	writeDoubleToAssoc(file, "matrNoise", matrNoise, 5);
 	writeIntToAssoc(file, "wrapParams", wrapParams);
 	writeDoubleToAssoc(file, "timeStep", timeStep, 10);
 	writeIntToAssoc(file, "numBools", numBools);
 	writeIntToAssoc(file, "numParams", numParams);
-	writeDoubleToAssoc(file, "threshold", threshold, 20);
-	writeDoubleArrToAssoc(file, "solProbEvo", solProbEvo, step, 10);
-	writeDoubleArrToAssoc(file, "expectedEnergyEvo", expectedEnergyEvo, step, 10);
-	writeNestedDoubleArrToAssoc(file, "paramEvo", paramEvo, 2, (int []) {numParams, maxIterations}, step, 10);
 	
-	// record evolution of the spectrum
-	writeIntToAssoc(file, "spectrumSize", spectrumSize);
-	writeDoubleArrToAssoc(file, "spectrum", spectrum, spectrumSize, 1);
-	writeIntArrToAssoc(file, "spectrumDegeneracy", degeneracy, spectrumSize);
-	writeIntToAssoc(file, "solStateSpecInd", solStateSpecInd);
-	writeNestedDoubleArrToAssoc(file, "specEvo", specProbEvo, 2, (int []) {spectrumSize, maxIterations}, step, 10);
+	// solution, energy, param evolution
+	writeNestedDoubleArrToAssoc(file, "solProbEvos", solProbEvo, 2, (int []) {simRepetitions, maxIterations}, maxIterations, 10);
+	writeNestedDoubleArrToAssoc(file, "expectedEnergyEvos", expectedEnergyEvo, 2, (int []) {simRepetitions, maxIterations}, maxIterations, 10);
+	writeNestedDoubleArrToAssoc(file, "paramEvos", paramEvo, 3, (int []) {simRepetitions, numParams, maxIterations}, maxIterations, 10);
 	
+	if (hamil.type == PAULI_TERMS) {
+		writeStringToAssoc(file, "hamilType", "PAULI_TERMS");
+	}
+	if (hamil.type == DIAGONAL) {
+		
+		// 3SAT equ
+		writeStringToAssoc(file, "hamilType", "DIAGONAL");
+		writeIntArrToAssoc(file, "3SATEqu", equ, numClauses*3);
+		writeIntArrToAssoc(file, "3SATSol", sol, numBools);
+		
+		// spectrum evolution
+		writeIntToAssoc(file, "spectrumSize", spectrumSize);
+		writeDoubleArrToAssoc(file, "spectrum", spectrum, spectrumSize, 1);
+		writeIntArrToAssoc(file, "spectrumDegeneracy", degeneracy, spectrumSize);
+		writeIntToAssoc(file, "solStateSpecInd", solStateSpecInd);
+		writeNestedDoubleArrToAssoc(file, "specEvos", specProbEvo, 3, (int []) {simRepetitions, spectrumSize, maxIterations}, maxIterations, 10);
+	}
+
 	closeAssocWrite(file);
 	
-	
-	// DEBuG
-	for (int i=0; i < step; i++)
-		printf("%lf\n", paramEvo[0][i]);
-	printf("\n\n\n");
-	for (int i=0; i < step; i++)
-		printf("%lf\n", paramEvo[1][i]);
 	
 	
 	/*
 	 * TIDY UP
 	 */
-	
-	// cleanup
-	freeEvolverMemory(&mem);
+	 
+	if (hamil.type == DIAGONAL) {
+		free(equ);
+		free(sol);
+		free(spectrum);
+		free(degeneracy);
+		free(stateToSpecMap);
+	}
 	freeHamil(hamil);
-	free(equ);
-	free(sol);
-	free(spectrum);
-	free(degeneracy);
-	free(stateToSpecMap);
-	
-	// unload QuEST
+	freeEvolverMemory(&mem);
 	destroyMultiQubit(qubits, env); 
 	closeQuESTEnv(env);
+	
 	return 0;
 }
