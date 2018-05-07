@@ -159,7 +159,7 @@ int main(int narg, char *varg[]) {
 		return 1;
 	}
 	if (progressPrintFrequency < 0) {
-		printf("ERROR! print_progress_every must be greater than 0 (1 for every iteration)\n");
+		printf("ERROR! print_progress_every must be positive (1 for every iteration, 0 for never)\n");
 	}
 	
 	printf("THE TRESHOLD IS NOW BEING IGNORED!!!\n\n");
@@ -237,6 +237,13 @@ int main(int narg, char *varg[]) {
 	/*
 	 * PREPARE DATA RECORDING
 	 */
+	 
+	// pre-allocate initial param values (GSL messes with seeding)
+	double params[numParams];
+	double initParams[simRepetitions][numParams];
+	for (int s=0; s < simRepetitions; s++)
+		for (int i=0; i < numParams; i++)
+			initParams[s][i] = (rand()/(double) RAND_MAX) * 2 * M_PI;
 	
 	// prepare records of param values
 	double paramEvo[simRepetitions][numParams][maxIterations];
@@ -296,21 +303,17 @@ int main(int narg, char *varg[]) {
 	setAnsatzInitState(&mem, qubits);
 	
 	evolveOutcome outcome;
-	int step;
-	double prob;
-	double energy;
+	double prob, energy;
 	
 	// re-simulate many times
 	for (int rep=0; rep < simRepetitions; rep++) {
-		step = 0;
 	
 		// set random initial param values
-		double params[numParams];
 		for (int i=0; i < numParams; i++)
-			params[i] = (rand()/(double) RAND_MAX) * 2 * M_PI;
+			params[i] = initParams[rep][i];
 		
 		// keep evolving until we converge or reach max iterations
-		while (step < maxIterations) {
+		for (int step = 0; step < maxIterations; step++) {
 			
 			// update params under parameterised evolution
 			outcome = evolveParams(
@@ -328,7 +331,7 @@ int main(int narg, char *varg[]) {
 			// monitor convergence
 			prob = getProbEl(qubits, solState);
 			energy = getExpectedEnergy(mem.hamilState, qubits, hamil);
-			if (step % progressPrintFrequency == 0)
+			if (progressPrintFrequency != 0 && step % progressPrintFrequency == 0)
 				printf("t%d: \t prob(sol) = %f \t <E> = %f\n", step, prob, energy);
 			
 			// record param evo data
@@ -345,7 +348,6 @@ int main(int narg, char *varg[]) {
 					specProbEvo[rep][stateToSpecMap[i]][step] += getProbEl(qubits, i);
 			}
 			
-			
 			// randomly wiggle params
 			/*
 			if (step > 0 && step % 50 == 0) {
@@ -355,9 +357,7 @@ int main(int narg, char *varg[]) {
 					params[i] += 0.01 * 2*M_PI*(rand() / (double) RAND_MAX);
 			}
 			*/
-			
-			step += 1;
-		}
+					}
 	
 	
 	}

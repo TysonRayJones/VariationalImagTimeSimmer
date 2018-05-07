@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[     11182,        259]
-NotebookOptionsPosition[     10247,        235]
-NotebookOutlinePosition[     10604,        251]
-CellTagsIndexPosition[     10561,        248]
+NotebookDataLength[     12813,        293]
+NotebookOptionsPosition[     11688,        267]
+NotebookOutlinePosition[     12045,        283]
+CellTagsIndexPosition[     12002,        280]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -87,9 +87,13 @@ Cell[BoxData[
    TableForm[BoxForm`e$]]]], "Output",
  CellChangeTimes->{{3.7346995796492987`*^9, 3.734699585648263*^9}, 
    3.734699688036615*^9, 3.734702098040193*^9, 3.7347022519069633`*^9, 
-   3.734702334899104*^9, 3.734702973471282*^9, 
-   3.734703045209919*^9},ExpressionUUID->"ca71609c-3b31-4d09-97df-\
-0210dfd99c16"]
+   3.734702334899104*^9, 3.734702973471282*^9, 3.734703045209919*^9, 
+   3.734709949922669*^9, 3.7347101365925913`*^9, {3.734710568339328*^9, 
+   3.734710601647081*^9}, {3.734710700077771*^9, 3.734710739801094*^9}, 
+   3.734710774234666*^9, 3.734710822881415*^9, 3.7347108722360287`*^9, 
+   3.7347118857682323`*^9, 
+   3.734711916875657*^9},ExpressionUUID->"d09ce976-6709-4855-8f26-\
+d995a13b0b15"]
 }, Open  ]],
 
 Cell[CellGroupData[{
@@ -151,18 +155,18 @@ Cell[BoxData[
 Cell[BoxData[
  TagBox[
   StyleBox[
-   DynamicModuleBox[{$CellContext`rep$$ = 5, Typeset`show$$ = True, 
+   DynamicModuleBox[{$CellContext`rep$$ = 2, Typeset`show$$ = True, 
     Typeset`bookmarkList$$ = {}, Typeset`bookmarkMode$$ = "Menu", 
     Typeset`animator$$, Typeset`animvar$$ = 1, Typeset`name$$ = 
     "\"untitled\"", Typeset`specs$$ = {{
-      Hold[$CellContext`rep$$], {1, 2, 3, 4, 5}}}, Typeset`size$$ = {
-    180., {196.634033203125, 202.365966796875}}, Typeset`update$$ = 0, 
+      Hold[$CellContext`rep$$], {1, 2, 3}}}, Typeset`size$$ = {
+    180., {197.634033203125, 203.365966796875}}, Typeset`update$$ = 0, 
     Typeset`initDone$$, Typeset`skipInitDone$$ = 
-    True, $CellContext`rep$11625$$ = 0}, 
+    True, $CellContext`rep$6311$$ = 0}, 
     DynamicBox[Manipulate`ManipulateBoxes[
      1, StandardForm, "Variables" :> {$CellContext`rep$$ = 1}, 
       "ControllerVariables" :> {
-        Hold[$CellContext`rep$$, $CellContext`rep$11625$$, 0]}, 
+        Hold[$CellContext`rep$$, $CellContext`rep$6311$$, 0]}, 
       "OtherVariables" :> {
        Typeset`show$$, Typeset`bookmarkList$$, Typeset`bookmarkMode$$, 
         Typeset`animator$$, Typeset`animvar$$, Typeset`name$$, 
@@ -180,9 +184,9 @@ Cell[BoxData[
           Part[
            $CellContext`assoc["expectedEnergyEvos"], $CellContext`rep$$], 
           PlotLabel -> "<E>", PlotRange -> All]}], 
-      "Specifications" :> {{$CellContext`rep$$, {1, 2, 3, 4, 5}}}, 
+      "Specifications" :> {{$CellContext`rep$$, {1, 2, 3}}}, 
       "Options" :> {Paneled -> False}, "DefaultOptions" :> {}],
-     ImageSizeCache->{200., {233., 238.}},
+     ImageSizeCache->{200., {234., 239.}},
      SingleEvaluation->True],
     Deinitialization:>None,
     DynamicModuleValues:>{},
@@ -229,9 +233,37 @@ Cell[BoxData[
    3.734699681958374*^9, 3.73469969944979*^9}, 3.734702099642172*^9, {
    3.7347022286878157`*^9, 3.734702238560444*^9}, 3.734702973502118*^9, 
    3.734703045264419*^9, {3.734709277102603*^9, 3.734709284169168*^9}, 
-   3.73470936140333*^9},ExpressionUUID->"8edace42-7890-49d4-8e9f-\
-5d08945ac9f9"]
-}, Open  ]]
+   3.73470936140333*^9, 3.734709949986055*^9, 3.7347101366355333`*^9, 
+   3.734710568420189*^9, 3.73471060169433*^9, {3.734710700122343*^9, 
+   3.734710739864828*^9}, 3.734710774302312*^9, 3.734710822944455*^9, 
+   3.734710872401514*^9, 3.734710919146214*^9, 3.7347118859339123`*^9, 
+   3.734711916940321*^9},ExpressionUUID->"fc7ff184-0923-4948-a35a-\
+8418f8b053c9"]
+}, Open  ]],
+
+Cell[TextData[{
+ StyleBox["A note about seeding",
+  FontWeight->"Bold"],
+ ":\[LineSeparator]Although the random initial param values are chosen before \
+simulation (based on the seed), GSL\[CloseCurlyQuote]s numerically methods \
+may use RNG and affect numerics for each iteration and between \
+re-simulations. Therefore, repeating a call to ",
+ StyleBox["Variational3SATSolver",
+  FontWeight->"Bold"],
+ " with the same seed but a different ",
+ StyleBox["maxIterations",
+  FontWeight->"Bold"],
+ " may change the behaviour of each re-simulation."
+}], "Text",
+ CellChangeTimes->{{3.734711030084848*^9, 3.734711077929193*^9}, {
+  3.734711954080243*^9, 3.734712037937565*^9}},
+ Background->RGBColor[
+  0.88, 1, 0.88],ExpressionUUID->"765113a2-8f30-4b44-9bec-0dab14f65cae"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{
+  3.734711945011292*^9},ExpressionUUID->"8db3e205-ec34-41f5-ade8-\
+c6a7499a8097"]
 },
 WindowSize->{960, 775},
 WindowMargins->{{0, Automatic}, {Automatic, 0}},
@@ -255,12 +287,14 @@ Cell[690, 25, 175, 4, 30, "Input",ExpressionUUID->"fc782480-485c-4398-905d-7ca9b
 Cell[868, 31, 299, 7, 30, "Input",ExpressionUUID->"dbca3f88-c41c-48a9-a2d3-0e39e7d024bc"],
 Cell[CellGroupData[{
 Cell[1192, 42, 334, 7, 30, "Input",ExpressionUUID->"3d768e4b-2527-4651-aac1-0ef086b223af"],
-Cell[1529, 51, 1372, 40, 366, "Output",ExpressionUUID->"ca71609c-3b31-4d09-97df-0210dfd99c16"]
+Cell[1529, 51, 1640, 44, 366, "Output",ExpressionUUID->"d09ce976-6709-4855-8f26-d995a13b0b15"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[2938, 96, 2635, 52, 409, "Input",ExpressionUUID->"2a1be25d-f530-4e17-bc04-6e4ef882e744"],
-Cell[5576, 150, 4655, 82, 490, "Output",ExpressionUUID->"8edace42-7890-49d4-8e9f-5d08945ac9f9"]
-}, Open  ]]
+Cell[3206, 100, 2635, 52, 409, "Input",ExpressionUUID->"2a1be25d-f530-4e17-bc04-6e4ef882e744"],
+Cell[5844, 154, 4926, 86, 492, "Output",ExpressionUUID->"fc7ff184-0923-4948-a35a-8418f8b053c9"]
+}, Open  ]],
+Cell[10785, 243, 768, 17, 120, "Text",ExpressionUUID->"765113a2-8f30-4b44-9bec-0dab14f65cae"],
+Cell[11556, 262, 128, 3, 30, "Input",ExpressionUUID->"8db3e205-ec34-41f5-ade8-c6a7499a8097"]
 }
 ]
 *)
