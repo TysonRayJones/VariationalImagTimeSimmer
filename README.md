@@ -16,6 +16,12 @@ The QuEST `makefile` must be adapted for GSL. The changes are outlined [here](ht
 
 # Running
 
+THESE INSTRUCTIONS ARE OUT OF DATE: instead, run
+```bash
+./Variational3SATSolver help
+```
+OLD INSTRUCTIONS:
+
 `Variational3SATSolver` accepts 9 command-line arguments:
 - `num_bools`: 3SAT problem size (a random instance will be generated)
  - `num_params`: the number of parameterised gates in the ansatz circuit
