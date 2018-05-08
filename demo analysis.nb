@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[     12813,        293]
-NotebookOptionsPosition[     11688,        267]
-NotebookOutlinePosition[     12045,        283]
-CellTagsIndexPosition[     12002,        280]
+NotebookDataLength[     13926,        312]
+NotebookOptionsPosition[     12890,        287]
+NotebookOutlinePosition[     13252,        303]
+CellTagsIndexPosition[     13209,        300]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -91,9 +91,10 @@ Cell[BoxData[
    3.734709949922669*^9, 3.7347101365925913`*^9, {3.734710568339328*^9, 
    3.734710601647081*^9}, {3.734710700077771*^9, 3.734710739801094*^9}, 
    3.734710774234666*^9, 3.734710822881415*^9, 3.7347108722360287`*^9, 
-   3.7347118857682323`*^9, 
-   3.734711916875657*^9},ExpressionUUID->"d09ce976-6709-4855-8f26-\
-d995a13b0b15"]
+   3.7347118857682323`*^9, 3.734711916875657*^9, 3.734772160284753*^9, {
+   3.734774237800824*^9, 
+   3.7347742502749567`*^9}},ExpressionUUID->"c0adca62-dea5-4959-824f-\
+da9677b3e586"]
 }, Open  ]],
 
 Cell[CellGroupData[{
@@ -131,8 +132,24 @@ Cell[BoxData[
         RowBox[{"PlotLabel", " ", "\[Rule]", " ", "\"\<<E>\>\""}], ",", 
         "\[IndentingNewLine]", "\t\t\t", 
         RowBox[{"PlotRange", "\[Rule]", " ", "All"}]}], "\[IndentingNewLine]",
-        "\t\t", "]"}]}], "\[IndentingNewLine]", "\t", "}"}]}], ",", 
-   "\[IndentingNewLine]", "\t", 
+        "\t\t", "]"}], ",", "\[IndentingNewLine]", "\t\t", 
+      RowBox[{"ListPlot", "[", "\[IndentingNewLine]", "\t\t\t", 
+       RowBox[{
+        RowBox[{"Transpose", " ", "@", " ", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"assoc", "[", "\"\<spectrum\>\"", "]"}], ",", " ", 
+           RowBox[{"assoc", "[", "\"\<spectrumDegeneracy\>\"", "]"}]}], 
+          "}"}]}], ",", "\[IndentingNewLine]", "\t\t\t", 
+        RowBox[{"PlotLabel", "\[Rule]", " ", "\"\<spectrum\>\""}], ",", " ", 
+        "\[IndentingNewLine]", "\t\t\t", 
+        RowBox[{"AxesLabel", "\[Rule]", " ", 
+         RowBox[{"{", 
+          RowBox[{"\"\<E\>\"", ",", " ", "\"\<degeneracy\>\""}], "}"}]}], ",",
+         "\[IndentingNewLine]", "\t\t\t", 
+        RowBox[{"Filling", " ", "\[Rule]", " ", "Axis"}]}], 
+       "\[IndentingNewLine]", "\t\t", "]"}]}], "\[IndentingNewLine]", "\t", 
+     "}"}]}], ",", "\[IndentingNewLine]", "\t", 
    RowBox[{"{", 
     RowBox[{"rep", ",", " ", 
      RowBox[{"Range", " ", "@", " ", 
@@ -149,24 +166,25 @@ Cell[BoxData[
    3.734699568097187*^9, 3.73469963931054*^9}, {3.734699675559827*^9, 
    3.7346996991504917`*^9}, {3.734702211205324*^9, 3.734702238165264*^9}, {
    3.734709227048356*^9, 3.7347093154366903`*^9}, {3.734709360124855*^9, 
-   3.7347093609016857`*^9}},ExpressionUUID->"2a1be25d-f530-4e17-bc04-\
+   3.7347093609016857`*^9}, {3.7347720989105787`*^9, 
+   3.734772112020445*^9}},ExpressionUUID->"2a1be25d-f530-4e17-bc04-\
 6e4ef882e744"],
 
 Cell[BoxData[
  TagBox[
   StyleBox[
-   DynamicModuleBox[{$CellContext`rep$$ = 2, Typeset`show$$ = True, 
+   DynamicModuleBox[{$CellContext`rep$$ = 10, Typeset`show$$ = True, 
     Typeset`bookmarkList$$ = {}, Typeset`bookmarkMode$$ = "Menu", 
     Typeset`animator$$, Typeset`animvar$$ = 1, Typeset`name$$ = 
     "\"untitled\"", Typeset`specs$$ = {{
-      Hold[$CellContext`rep$$], {1, 2, 3}}}, Typeset`size$$ = {
-    180., {197.634033203125, 203.365966796875}}, Typeset`update$$ = 0, 
-    Typeset`initDone$$, Typeset`skipInitDone$$ = 
-    True, $CellContext`rep$6311$$ = 0}, 
+      Hold[$CellContext`rep$$], {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}}, 
+    Typeset`size$$ = {180., {272.634033203125, 278.365966796875}}, 
+    Typeset`update$$ = 0, Typeset`initDone$$, Typeset`skipInitDone$$ = 
+    True, $CellContext`rep$15272$$ = 0}, 
     DynamicBox[Manipulate`ManipulateBoxes[
      1, StandardForm, "Variables" :> {$CellContext`rep$$ = 1}, 
       "ControllerVariables" :> {
-        Hold[$CellContext`rep$$, $CellContext`rep$6311$$, 0]}, 
+        Hold[$CellContext`rep$$, $CellContext`rep$15272$$, 0]}, 
       "OtherVariables" :> {
        Typeset`show$$, Typeset`bookmarkList$$, Typeset`bookmarkMode$$, 
         Typeset`animator$$, Typeset`animvar$$, Typeset`name$$, 
@@ -183,10 +201,15 @@ Cell[BoxData[
          ListLinePlot[
           Part[
            $CellContext`assoc["expectedEnergyEvos"], $CellContext`rep$$], 
-          PlotLabel -> "<E>", PlotRange -> All]}], 
-      "Specifications" :> {{$CellContext`rep$$, {1, 2, 3}}}, 
-      "Options" :> {Paneled -> False}, "DefaultOptions" :> {}],
-     ImageSizeCache->{200., {234., 239.}},
+          PlotLabel -> "<E>", PlotRange -> All], 
+         ListPlot[
+          Transpose[{
+            $CellContext`assoc["spectrum"], 
+            $CellContext`assoc["spectrumDegeneracy"]}], PlotLabel -> 
+          "spectrum", AxesLabel -> {"E", "degeneracy"}, Filling -> Axis]}], 
+      "Specifications" :> {{$CellContext`rep$$, {1, 2, 3, 4, 5, 6, 7, 8, 9, 
+         10}}}, "Options" :> {Paneled -> False}, "DefaultOptions" :> {}],
+     ImageSizeCache->{200., {310., 315.}},
      SingleEvaluation->True],
     Deinitialization:>None,
     DynamicModuleValues:>{},
@@ -237,8 +260,10 @@ Cell[BoxData[
    3.734710568420189*^9, 3.73471060169433*^9, {3.734710700122343*^9, 
    3.734710739864828*^9}, 3.734710774302312*^9, 3.734710822944455*^9, 
    3.734710872401514*^9, 3.734710919146214*^9, 3.7347118859339123`*^9, 
-   3.734711916940321*^9},ExpressionUUID->"fc7ff184-0923-4948-a35a-\
-8418f8b053c9"]
+   3.734711916940321*^9, 3.734772114422576*^9, 3.7347721605265093`*^9, {
+   3.734774237970859*^9, 
+   3.734774250428811*^9}},ExpressionUUID->"d15ba853-be43-4a0b-803e-\
+105f51c326f5"]
 }, Open  ]],
 
 Cell[TextData[{
@@ -258,15 +283,10 @@ re-simulations. Therefore, repeating a call to ",
  CellChangeTimes->{{3.734711030084848*^9, 3.734711077929193*^9}, {
   3.734711954080243*^9, 3.734712037937565*^9}},
  Background->RGBColor[
-  0.88, 1, 0.88],ExpressionUUID->"765113a2-8f30-4b44-9bec-0dab14f65cae"],
-
-Cell[BoxData[""], "Input",
- CellChangeTimes->{
-  3.734711945011292*^9},ExpressionUUID->"8db3e205-ec34-41f5-ade8-\
-c6a7499a8097"]
+  0.88, 1, 0.88],ExpressionUUID->"765113a2-8f30-4b44-9bec-0dab14f65cae"]
 },
-WindowSize->{960, 775},
-WindowMargins->{{0, Automatic}, {Automatic, 0}},
+WindowSize->{818, 1035},
+WindowMargins->{{Automatic, -1920}, {Automatic, 0}},
 FrontEndVersion->"11.2 for Mac OS X x86 (32-bit, 64-bit Kernel) (September \
 10, 2017)",
 StyleDefinitions->"Default.nb"
@@ -287,14 +307,13 @@ Cell[690, 25, 175, 4, 30, "Input",ExpressionUUID->"fc782480-485c-4398-905d-7ca9b
 Cell[868, 31, 299, 7, 30, "Input",ExpressionUUID->"dbca3f88-c41c-48a9-a2d3-0e39e7d024bc"],
 Cell[CellGroupData[{
 Cell[1192, 42, 334, 7, 30, "Input",ExpressionUUID->"3d768e4b-2527-4651-aac1-0ef086b223af"],
-Cell[1529, 51, 1640, 44, 366, "Output",ExpressionUUID->"d09ce976-6709-4855-8f26-d995a13b0b15"]
+Cell[1529, 51, 1714, 45, 366, "Output",ExpressionUUID->"c0adca62-dea5-4959-824f-da9677b3e586"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[3206, 100, 2635, 52, 409, "Input",ExpressionUUID->"2a1be25d-f530-4e17-bc04-6e4ef882e744"],
-Cell[5844, 154, 4926, 86, 492, "Output",ExpressionUUID->"fc7ff184-0923-4948-a35a-8418f8b053c9"]
+Cell[3280, 101, 3513, 69, 535, "Input",ExpressionUUID->"2a1be25d-f530-4e17-bc04-6e4ef882e744"],
+Cell[6796, 172, 5307, 93, 644, "Output",ExpressionUUID->"d15ba853-be43-4a0b-803e-105f51c326f5"]
 }, Open  ]],
-Cell[10785, 243, 768, 17, 120, "Text",ExpressionUUID->"765113a2-8f30-4b44-9bec-0dab14f65cae"],
-Cell[11556, 262, 128, 3, 30, "Input",ExpressionUUID->"8db3e205-ec34-41f5-ade8-c6a7499a8097"]
+Cell[12118, 268, 768, 17, 143, "Text",ExpressionUUID->"765113a2-8f30-4b44-9bec-0dab14f65cae"]
 }
 ]
 *)

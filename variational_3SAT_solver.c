@@ -2,6 +2,7 @@
  * Solves 3SAT problems by Wick rotation
  */
 
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <QuEST.h>					// for simulating ansatz
@@ -123,25 +124,115 @@ int main(int narg, char *varg[]) {
 	/*
 	 * GET CMD ARGS 
 	 */
-	 	 
-	if (narg != 11) {
-		printf("ERROR! Call with arguments:\n");
-		printf("num_bools\nnum_params\nrseed\ntimestep[0 for auto]\nmax_iters\nwrap_params\n");
-		printf("deriv_accuracy[1 to 4]\nmatrix_noise[0 to 1]\nsim_reps\nprint_progress_every\n");
+	
+	// list of args
+	int numBools;
+	int numParams;
+	int randSeed;
+	double timeStep;
+	int maxIterations;
+	int wrapParams;
+	int derivAccuracy;
+	double matrNoise;
+	int simRepetitions;
+	int progressPrintFrequency;
+	
+	// interactive arg input
+	if (narg == 2 && !strcmp(varg[1], "help")) {
+		
+		printf("\n");
+		printf("Enter the number of qubits (or booleans in the 3SAT equation)\n(must be >= 4)\n");
+		printf("num_bools: ");
+		scanf("%d", &numBools);
+		printf("\n");
+		
+		printf("Enter the number of parameters total in the ansatz circuit\n");
+		printf("num_params: ");
+		scanf("%d", &numParams);
+		printf("\n");
+		
+		printf("Enter the random seed for generating 3SATs, initial param values, matrix noise " 
+			   "and GSL numerics\n");
+		printf("rseed: ");
+		scanf("%d", &randSeed);
+		printf("\n");
+		
+		printf("Enter the time-step (float), or 0 for auto\n");
+		printf("timestep: ");
+		scanf("%lf", &timeStep);
+		printf("\n");
+		
+		printf("Enter the maximum number of variational iterations in each simulation");
+		printf("max_iters: ");
+		scanf("%d", &maxIterations);
+		printf("\n");
+		
+		printf("Enter whether to wrap-around params to keep them in [0, 2PI)\n"
+			   "(1 for yes, 0 for no)\n");
+		printf("wrap_params: ");
+		scanf("%d", &wrapParams);
+		printf("\n");
+		
+		printf("Enter the accuracy of the derivative estimates, as a finite-difference order\n"
+			   "(1 for fastest, 4 for most accurate)\n");
+		printf("deriv_accuracy: ");
+		scanf("%d", &derivAccuracy);
+		printf("\n");
+		
+		printf("Enter the fraction of random noise in the A and C matrices each iteration\n"
+			   "(0 for no noise, e.g. 0.3 for maximum +- 30%% random fluctuation in each element)\n");
+		printf("matrix_noise: ");
+		scanf("%lf", &matrNoise);
+		printf("\n");
+		
+		printf("Enter the number of times to resimulate the given system with different "
+			   "random initial parameters\n");
+		printf("sim_reps: ");
+		scanf("%d", &simRepetitions);
+		printf("\n");
+		
+		printf("Enter how frequently convergence progress should be printed, which slows execution\n"
+			   "(0 for never, 1 for every iteration, n for every n iterations)\n");
+		printf("print_progress_every: ");
+		scanf("%d", &progressPrintFrequency);
+		printf("\n");
+		
+	// invalid number of args input
+	} else if (narg != 11) {
+		printf("\nERROR! Call with arguments:\n");
+		printf(
+			"num_bools\n"
+			"num_params\n"
+			"rseed\n"
+			"timestep[0 for auto]\n"
+			"max_iters\n"
+			"wrap_params\n"
+			"deriv_accuracy[1 to 4]\n"
+			"matrix_noise[0 to 1]\n"
+			"sim_reps\n"
+			"print_progress_every\n"
+			"\n"
+			"Run './Variational3SATSolver help' to enter arguments interactively\n\n");
+			
 		return 1;
+		
+	// cmd arg input
+	} else {
+	
+		numBools = atoi(varg[1]);
+		numParams = atoi(varg[2]);
+		randSeed = atoi(varg[3]); 
+		sscanf(varg[4], "%lf", &timeStep);
+		maxIterations = atoi(varg[5]);
+		wrapParams = atoi(varg[6]);
+		derivAccuracy = atoi(varg[7]);
+		sscanf(varg[8], "%lf", &matrNoise);
+		simRepetitions = atoi(varg[9]);
+		progressPrintFrequency = atoi(varg[10]);
+	
 	}
 	
-	int numBools = atoi(varg[1]);
-	int numParams = atoi(varg[2]);
-	srand(atoi(varg[3]));
-	double timeStep; sscanf(varg[4], "%lf", &timeStep);
-	int maxIterations = atoi(varg[5]);
-	int wrapParams = atoi(varg[6]);
-	int derivAccuracy = atoi(varg[7]);
-	double matrNoise; sscanf(varg[8], "%lf", &matrNoise);
-	int simRepetitions = atoi(varg[9]);
-	int progressPrintFrequency = atoi(varg[10]);
-	
+	// invalid arg values
 	if (numBools < 4) {
 		printf("ERROR! Minimum num_bools is 4\n");
 		return 1;
@@ -162,13 +253,13 @@ int main(int narg, char *varg[]) {
 		printf("ERROR! print_progress_every must be positive (1 for every iteration, 0 for never)\n");
 	}
 	
-	printf("THE TRESHOLD IS NOW BEING IGNORED!!!\n\n");
-	
 	
 	
 	/*
 	 * PREPARE SIMULATION
 	 */
+	 
+	srand(randSeed);
 	
 	// testing chemistry Hamiltonian
 	/*
