@@ -423,7 +423,7 @@ int main(int narg, char *varg[]) {
 			}
 			
 			
-			if (step == 100) {
+			if (step % 100 == 0) {
 				exciteStateInHamiltonian(&mem, qubits);
 				printf("EXCITED THE CURRENT STATE!\n");
 				//clearExcitedStates(&mem);
@@ -431,8 +431,6 @@ int main(int narg, char *varg[]) {
 				for (int i=0; i < numParams; i++)
 					params[i] = initParams[rep][i];
 			}
-			
-			
 			
 			// update params under exact evolution
 			//evolveWavefunction(qubits, hamil, timeStep);

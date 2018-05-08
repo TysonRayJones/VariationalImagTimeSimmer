@@ -170,7 +170,7 @@ double complex innerProduct(double complex* vec1, double complex* vec2, long lon
 	
 	double complex prod = 0;
 	for (long long int i=0LL; i < length; i++)
-		prod += vec1[i]*vec2[i];
+		prod += conj(vec1[i])*vec2[i];
 	
 	return prod;
 }
@@ -178,7 +178,7 @@ double complex innerProductOnQubits(double complex* vec1, MultiQubit qubits, lon
 	
 	double complex prod = 0;
 	for (long long int i=0LL; i < length; i++)
-		prod += vec1[i]*(getRealAmpEl(qubits,i) + I*getImagAmpEl(qubits,i));
+		prod += conj(vec1[i])*(getRealAmpEl(qubits,i) + I*getImagAmpEl(qubits,i));
 	
 	return prod;
 }
@@ -586,7 +586,7 @@ void clearExcitedStates(EvolverMemory *memory) {
 	
 	for (int i=0; i < memory->numSavedStates; i++)
 		free(memory->savedStates[i]);
-	memory->numSavedStates = 0;	
+	memory->numSavedStates = 0;
 }
 
 
