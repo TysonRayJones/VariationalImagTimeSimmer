@@ -258,7 +258,7 @@ int main(int narg, char *varg[]) {
 	/*
 	 * PREPARE SIMULATION
 	 */
-	 
+	
 	srand(randSeed);
 	
 	// testing chemistry Hamiltonian
@@ -407,14 +407,32 @@ int main(int narg, char *varg[]) {
 		for (int step = 0; step < maxIterations; step++) {
 			
 			// update params under parameterised evolution
-			outcome = evolveParams(
-				&mem, defaultAnsatzCircuit, approxParamsByTikhonov,
-				qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
+			//if (step % 2 == 0) {
+				outcome = evolveParams(
+					&mem, defaultAnsatzCircuit, approxParamsByTikhonov,
+					qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
+			/*} else {
+				evolveParamsByGradientDescent(
+					&mem, defaultAnsatzCircuit, qubits, params, hamil, timeStep, wrapParams, derivAccuracy
+				);
+			}*/
 			
 			if (outcome == FAILED) {
 				printf("Numerical inversion failed! Aborting entire sim!\n");
 				return 1;
 			}
+			
+			
+			if (step == 100) {
+				exciteStateInHamiltonian(&mem, qubits);
+				printf("EXCITED THE CURRENT STATE!\n");
+				//clearExcitedStates(&mem);
+				
+				for (int i=0; i < numParams; i++)
+					params[i] = initParams[rep][i];
+			}
+			
+			
 			
 			// update params under exact evolution
 			//evolveWavefunction(qubits, hamil, timeStep);
@@ -448,12 +466,13 @@ int main(int narg, char *varg[]) {
 					params[i] += 0.01 * 2*M_PI*(rand() / (double) RAND_MAX);
 			}
 			*/
-					}
-	
-	
+		}
+		
+		// clear any previously-saved excitations
+		clearExcitedStates(&mem);
 	}
 	
-
+	
 	
 	/*
 	 * SAVE RESULTS TO FILE

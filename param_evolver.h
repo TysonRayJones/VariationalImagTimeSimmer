@@ -25,6 +25,10 @@ typedef struct {
 	double complex *hamilState;
 	double complex *initState;
 	
+	// saved spectrum states (for suguru's idea)
+	int numSavedStates;
+	double complex **savedStates;
+	
 	// gsl objects for invertible A
 	gsl_matrix *matrA;
 	gsl_permutation *permA;
@@ -147,6 +151,14 @@ void evolveParamsByGradientDescent(
  * evolver simulation, and afterward freed with freeEvolverMemory
  */
 EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numBlocks);
+
+/**
+ * Copies the state of qubits to the list of 'saved states', which are excited
+ * in the Hamiltonian in each variational iteration
+ */
+void exciteStateInHamiltonian(EvolverMemory *memory, MultiQubit qubits);
+
+void clearExcitedStates(EvolverMemory *memory);
 
 /**
  * Frees the memory allocated with prepareEvolverMemory. 

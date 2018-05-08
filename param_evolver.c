@@ -45,6 +45,9 @@ double FINITE_DIFFERENCE_COEFFS[4][4] = {
 };
 // https://en.wikipedia.org/wiki/Finite_difference_coefficient
 
+int MAX_NUM_SAVED_STATES = 100;
+
+double EXCITATION_OF_SAVED_STATES = 10;
 
 /**
  * Returns the number of parameters needed to repeat the default ansatz circuit
@@ -163,6 +166,24 @@ double realInnerProduct(double complex* vec1, double complex* vec2, long long in
 }
 
 
+double complex innerProduct(double complex* vec1, double complex* vec2, long long int length) {
+	
+	double complex prod = 0;
+	for (long long int i=0LL; i < length; i++)
+		prod += vec1[i]*vec2[i];
+	
+	return prod;
+}
+double complex innerProductOnQubits(double complex* vec1, MultiQubit qubits, long long int length) {
+	
+	double complex prod = 0;
+	for (long long int i=0LL; i < length; i++)
+		prod += vec1[i]*(getRealAmpEl(qubits,i) + I*getImagAmpEl(qubits,i));
+	
+	return prod;
+}
+
+
 /**
  * Populates the A and C matrices of derivatives inside of mem, using derivatives of 
  * the wavefunction which is produced by ansatzCircuit with the given parameters,
@@ -189,6 +210,26 @@ void computeDerivMatrices(
 	applyHamil(mem->hamilState, qubits, hamil);
 	for (int i=0; i < mem->numParams; i++)
 		gsl_vector_set(mem->vecC, i, -realInnerProduct(mem->derivs[i], mem->hamilState, mem->stateSize));
+}
+
+
+/**
+ * Updates the deriv matrices to reflect excitations in the Hamiltonian for each of the
+ * saved states (those recorded by exciteStateInHamiltonian)
+ */
+void exciteSavedStatesInDerivMatrices(EvolverMemory *mem, MultiQubit qubits) {
+	
+	for (int s=0; s < mem->numSavedStates; s++) {
+		double complex saveProjOnQubits = innerProductOnQubits(mem->savedStates[s], qubits, qubits.numAmps);
+	
+		for (int i=0; i < mem->numParams; i++) {
+			double complex saveProjOnDeriv = innerProduct(mem->derivs[i], mem->savedStates[s], qubits.numAmps);
+			
+			double currC = gsl_vector_get(mem->vecC, i);
+			double newC = currC - creal(saveProjOnDeriv * saveProjOnQubits) *  EXCITATION_OF_SAVED_STATES;
+			gsl_vector_set(mem->vecC, i, newC);
+		}
+	}
 }
 
 
@@ -404,6 +445,9 @@ evolveOutcome evolveParams(
 	// compute matrices A and C
 	computeDerivMatrices(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
 	
+	// morph C to excite Hamiltonain states
+	exciteSavedStatesInDerivMatrices(mem, qubits);
+	
 	// add a little noise to A and C
 	addNoiseToDerivMatrices(mem, matrNoise);
 	
@@ -435,7 +479,8 @@ evolveOutcome evolveParams(
  * and cannot numerically fail (besides repeated use not converging to a solution).
  */
 void evolveParamsByGradientDescent(
-	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
+	EvolverMemory *mem, 
+	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, int wrapParams,
 	int derivAccuracy) 
 {
@@ -477,6 +522,10 @@ EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 	memory.derivs = malloc(memory.numParams * sizeof *memory.derivs);
 	for (int i=0; i < memory.numParams; i++)
 		memory.derivs[i] = malloc(memory.stateSize * sizeof **memory.derivs);
+		
+	// allocate saved state objects
+	memory.numSavedStates = 0;
+	memory.savedStates = malloc(MAX_NUM_SAVED_STATES * sizeof *memory.savedStates);
 	
 	// allocate LU-decomp objects
 	memory.matrA = gsl_matrix_alloc(memory.numParams, memory.numParams);
@@ -512,6 +561,35 @@ EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 }
 
 
+void exciteStateInHamiltonian(EvolverMemory *memory, MultiQubit qubits) {
+	
+	// abort if we've run out of space
+	// TODO: don't abort, just re-allocate a bigger-sized array
+	if (memory->numSavedStates == MAX_NUM_SAVED_STATES) {
+		printf("WARNING! The maximum number of states (%d) have been excited in the Hamiltonian.\n"
+			   "This and future calls to exciteStateInHamiltonian do nothing!\n"
+			   "Remedy by increasing MAX_NUM_SAVED_STATES in param_evolver.c\n", MAX_NUM_SAVED_STATES);
+		return;
+	}
+	
+	// copy the state in qubits
+	double complex *state = malloc(qubits.numAmps * sizeof *state);
+	for (long long int i=0LL; i < qubits.numAmps; i++)
+		state[i] = getRealAmpEl(qubits, i) + I*getImagAmpEl(qubits, i);
+	
+	// save it 
+	memory->savedStates[(memory->numSavedStates)++] = state;
+}
+
+
+void clearExcitedStates(EvolverMemory *memory) {
+	
+	for (int i=0; i < memory->numSavedStates; i++)
+		free(memory->savedStates[i]);
+	memory->numSavedStates = 0;	
+}
+
+
 /**
  * Frees the memory allocated with prepareEvolverMemory. 
  * This should be done when there are no more calls to evolveParams
@@ -526,6 +604,11 @@ void freeEvolverMemory(EvolverMemory *memory) {
 	free(memory->derivs);
 	free(memory->hamilState);
 	free(memory->initState);
+	
+	// free saved states
+	for (int i=0; i < memory->numSavedStates; i++)
+		free(memory->savedStates[i]);
+	free(memory->savedStates);
 	
 	// free LU-decomp structures
 	gsl_matrix_free(memory->matrA);
