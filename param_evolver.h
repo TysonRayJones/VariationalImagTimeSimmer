@@ -57,44 +57,6 @@ typedef struct {
 	
 } EvolverMemory;
 
-
-
-/**
- * Returns the number of parameters needed to repeat the default ansatz circuit
- * numBlocks times, resulting in an equal number of gates (each with an individual parameter)
- * on each qubit
- */
-int chooseDefaultNumParams(MultiQubit qubits, int numBlocks);
-
-/**
- * Applies a default parameterised ansatz circuit to the zero state, modifying
- * the wavefunction in qubits according to the values in params. This can be passed
- * to evolveParams in lieu of a custom ansatz circuit
- */
-void defaultAnsatzCircuit(EvolverMemory *mem, MultiQubit qubits, double* params, int numParams);
-
-
-/**
- * Call after preparing qubits in the desired state to feed into
- * the ansatz at every evolution.
- * Can be recalled at any time during evolution to change the ansatz
- */
-void setAnsatzInitState(EvolverMemory *mem, MultiQubit qubits);
-
-
-
-
-
-/**
- * provided methods for numerically solving for the change in params (pass to evolveParams)
- * Individiaul descriptions are in param_evolver.c
- */
-int approxParamsByLUDecomp(EvolverMemory *mem);
-int approxParamsByLeastSquares(EvolverMemory *mem);
-int approxParamsByRemovingVar(EvolverMemory *mem);
-int approxParamsByTSVD(EvolverMemory *mem);
-int approxParamsByTikhonov(EvolverMemory *mem);
-
 /** flags which indicate the success of inversionMethod passed to evolveParams */
 typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
 
@@ -139,11 +101,19 @@ evolveOutcome evolveParams(
 /**
  * Behaves similarly to evolveParams, but using gradient descent (disregards A matrix)
  * and cannot numerically fail (besides repeated use not converging to a solution).
+ * @return SUCCESS		always
  */
-void evolveParamsByGradientDescent(
+evolveOutcome evolveParamsByGradientDescent(
 	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	MultiQubit qubits, double* params, Hamiltonian hamil, 
 	double timeStepSize, int wrapParams, int derivAccuracy);
+	
+/**
+ * returns whether the current simulation has halted, based on the evolution of the parameters
+ * evolution is stopped if, for each of the last NUM_ITERS_IN_STUCK_CHECK iterations, 
+ * the sum of (absolute) changes of the parameters is less than MAX_PARAM_CHANGE_WHEN_STUCK
+ */
+int isStuck(double* paramEvo, int simIteration, int numParams, int numIterations, int iteration);
 
 /**
  * Allocates memory for the data structures needed by the evolveParams function,

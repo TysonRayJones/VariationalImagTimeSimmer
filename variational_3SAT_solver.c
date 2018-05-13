@@ -1,5 +1,5 @@
 /** @file 
- * Solves 3SAT problems by Wick rotation
+ * Solves 3SAT and Chemistry problems by variational imaginary time propogation
  */
 
 #include <string.h>
@@ -8,6 +8,8 @@
 #include <QuEST.h>					// for simulating ansatz
 
 #include "hamiltonian_builder.h"	// for building and applying Hamiltonians
+#include "ansatz_circuits.h"		// for selecting ansatz circuits
+#include "linear_solvers.h" 		// for selecting numerical solving method
 #include "param_evolver.h"			// for variational imag-time simulation
 #include "true_evolver.h"			// for verifying variational sim
 #include "mmaformatter.h"			// for outputting results to mathematica
@@ -15,6 +17,19 @@
 
 #define OUTPUT_FILE "wickSATdata.txt"
 
+#define GROUND_REACHED_ENERGY_THRESHOLD 0.01
+
+
+double getMaxProb(MultiQubit qubits) {
+	
+	double maxProb = 0;
+	for (long long int i=0LL; i < qubits.numAmps; i++) {
+		double prob = getProbEl(qubits, i);
+		if (prob > maxProb)
+			maxProb = prob;
+	}
+	return maxProb;
+}
 
 
 double getStableTimeStep(double *hamil, long long int stateSize) {
@@ -115,6 +130,9 @@ void getSpectrum(
 	}
 	
 }
+
+
+
 
 
 int main(int narg, char *varg[]) {
@@ -262,25 +280,26 @@ int main(int narg, char *varg[]) {
 	srand(randSeed);
 	
 	// testing chemistry Hamiltonian
-	/*
-	Hamiltonian hamil = loadPauliHamilFromFile("hamtest6qb.txt");
+	
+	Hamiltonian hamil = loadPauliHamilFromFile("chemHamil10qb.txt");
 	printHamil(hamil);
 	
 	// monkeypatch
 	long long int solState = 0;
 	if (timeStep == 0)
 		timeStep = 0.01;
-	*/
+	
 	
 	
 	// generate a random 3SAT problem
 	int *equ, *sol;
 	int numClauses;
+	/*
 	Hamiltonian hamil = getRandom3SATHamil(numBools, &equ, &sol, &numClauses);
 	printHamil(hamil);
 	
 	// get state index of solution (for monitoring progress of QuEST state)
-	int solState = 0;
+	long long int solState = 0;
 	for (int i=0; i < numBools; i++)
 		solState += sol[numBools - i - 1] << i;
 	
@@ -291,6 +310,7 @@ int main(int narg, char *varg[]) {
 	if (timeStep == 0 && hamil.type == DIAGONAL)
 		timeStep = getStableTimeStep(hamil.diagHamil, pow(2, numBools));
 	printf("Time step: %lf\n", timeStep);
+	 */
 	
 	
 	// prepare QuEST
@@ -342,6 +362,16 @@ int main(int narg, char *varg[]) {
 		for (int j=0; j < numParams; j++)
 			for (int k=0; k < maxIterations; k++)
 				paramEvo[i][j][k] = -666;
+				
+	// record where, if anywhere, evolution stopped
+	int haltIterations[simRepetitions];
+	for (int i=0; i < simRepetitions; i++)
+		haltIterations[i] = -1;
+		
+	// record whether ground-state (for 3SAT diagonal sims) was reached
+	int groundReached[simRepetitions];
+	for (int i=0; i < simRepetitions; i++)
+		groundReached[i] = 0;
 	
 	// prepare records expected energy...
 	double expectedEnergyEvo[simRepetitions][maxIterations];
@@ -398,38 +428,36 @@ int main(int narg, char *varg[]) {
 	
 	// re-simulate many times
 	for (int rep=0; rep < simRepetitions; rep++) {
+		
+		// whethert his simulation has converged (not necessarily ground)
+		int hasBecomeStuck = 0;
 	
 		// set random initial param values
 		for (int i=0; i < numParams; i++)
 			params[i] = initParams[rep][i];
 		
+		// remove any static states from the Hamiltonian excitatins
+		clearExcitedStates(&mem);
+		energy = 1E5;
+		
 		// keep evolving until we converge or reach max iterations
 		for (int step = 0; step < maxIterations; step++) {
 			
 			// update params under parameterised evolution
-			//if (step % 2 == 0) {
+			
+			if (hasBecomeStuck && energy > GROUND_REACHED_ENERGY_THRESHOLD) {
+				outcome = evolveParamsByGradientDescent(
+					&mem, lowDepthChemistryAnsatzCircuit, 
+					qubits, params, hamil, timeStep, wrapParams, derivAccuracy);
+			}
+			else
 				outcome = evolveParams(
-					&mem, defaultAnsatzCircuit, approxParamsByTikhonov,
+					&mem, lowDepthChemistryAnsatzCircuit, approxParamsByTikhonov,
 					qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
-			/*} else {
-				evolveParamsByGradientDescent(
-					&mem, defaultAnsatzCircuit, qubits, params, hamil, timeStep, wrapParams, derivAccuracy
-				);
-			}*/
 			
 			if (outcome == FAILED) {
 				printf("Numerical inversion failed! Aborting entire sim!\n");
 				return 1;
-			}
-			
-			
-			if (step % 100 == 0) {
-				exciteStateInHamiltonian(&mem, qubits);
-				printf("EXCITED THE CURRENT STATE!\n");
-				//clearExcitedStates(&mem);
-				
-				for (int i=0; i < numParams; i++)
-					params[i] = initParams[rep][i];
 			}
 			
 			// update params under exact evolution
@@ -438,8 +466,12 @@ int main(int narg, char *varg[]) {
 			// monitor convergence
 			prob = getProbEl(qubits, solState);
 			energy = getExpectedEnergy(mem.hamilState, qubits, hamil);
-			if (progressPrintFrequency != 0 && step % progressPrintFrequency == 0)
-				printf("t%d: \t prob(sol) = %f \t <E> = %f\n", step, prob, energy);
+			if (progressPrintFrequency != 0 && step % progressPrintFrequency == 0) {
+				if (hamil.type == DIAGONAL)
+					printf("t%d: \t prob(sol) = %f \t <E> = %f\n", step, prob, energy);
+				else
+					printf("t%d: \t<E> = %f\n", step, energy);
+			}
 			
 			// record param evo data
 			solProbEvo[rep][step] = prob;
@@ -464,10 +496,31 @@ int main(int narg, char *varg[]) {
 					params[i] += 0.01 * 2*M_PI*(rand() / (double) RAND_MAX);
 			}
 			*/
+			
+			// mark if params have halted
+			/*
+			if ( //haltIterations[rep] == -1 && 
+				isStuck((double*) paramEvo, rep, numParams, maxIterations, step) &&
+				energy > 0.9) {
+					
+				haltIterations[rep] = step;
+				
+				exciteStateInHamiltonian(&mem, qubits);
+
+				for (int i=0; i < numParams; i++)
+					params[i] = initParams[rep][i];
+			}
+			*/
+			
+			if (!hasBecomeStuck && isStuck((double*) paramEvo, rep, numParams, maxIterations, step)) {
+				haltIterations[rep] = step;
+				hasBecomeStuck = 1;
+			}
 		}
 		
-		// clear any previously-saved excitations
-		clearExcitedStates(&mem);
+		
+		if (energy < GROUND_REACHED_ENERGY_THRESHOLD)
+			groundReached[rep] = 1;
 	}
 	
 	
@@ -488,11 +541,14 @@ int main(int narg, char *varg[]) {
 	writeDoubleToAssoc(file, "timeStep", timeStep, 10);
 	writeIntToAssoc(file, "numBools", numBools);
 	writeIntToAssoc(file, "numParams", numParams);
-	
-	// solution, energy, param evolution
+			
+	// solution, energy, param evolution, iteration when evolutio halted
 	writeNestedDoubleArrToAssoc(file, "solProbEvos", solProbEvo, 2, (int []) {simRepetitions, maxIterations}, maxIterations, 10);
 	writeNestedDoubleArrToAssoc(file, "expectedEnergyEvos", expectedEnergyEvo, 2, (int []) {simRepetitions, maxIterations}, maxIterations, 10);
+	writeNestedDoubleArrToAssoc(file, "initParams", initParams, 2, (int []) {simRepetitions, numParams}, numParams, 10);
 	writeNestedDoubleArrToAssoc(file, "paramEvos", paramEvo, 3, (int []) {simRepetitions, numParams, maxIterations}, maxIterations, 10);
+	writeIntArrToAssoc(file, "haltIterations", haltIterations, simRepetitions);
+	writeIntArrToAssoc(file, "groundReached", groundReached, simRepetitions);
 	
 	if (hamil.type == PAULI_TERMS) {
 		writeStringToAssoc(file, "hamilType", "PAULI_TERMS");

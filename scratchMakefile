@@ -13,12 +13,12 @@
 COMPILER = GNU
 
 # EXECUTABLE TO GENERATE
-EXE = Variational3SATSolver
+EXE = ScratchCode
 
 # USER SOURCE FILES
 # This makefile expects all user sources to be in the root directory.
 # If using more than one source, separate by spaces
-MY_C_SOURCES = variational_3SAT_solver ansatz_circuits linear_solvers param_evolver true_evolver hamiltonian_builder sat_generator mmaformatter
+MY_C_SOURCES = scratch_space param_evolver hamiltonian_builder sat_generator mmaformatter ansatz_circuits linear_solvers 
 
 # ENABLE DISTRIBUTED PROCESSING (ALLOWS MULTIPLE NODES)
 # On: 1, Off: 0
