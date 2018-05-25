@@ -6,18 +6,51 @@
 
 #include <QuEST.h>
 #include <complex.h>
+#include <string.h>
 
 #include "param_evolver.h"
 
 
-int getIdealNumParamsInAnsatz(void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), int numQubits) {
+#define LOW_DEPTH_ANSATZ_STR "lowDepth"
+#define HARDWARE_EFFICIENT_ANSATZ_STR "hardEff"
+
+#define DEBUG_ANSATZ_PRINT 0
+
+
+
+void debugPrint(char* gate, double param, int qb) {
 	
-	if (ansatzCircuit == hardwareEfficientChemistryAnsatzCircuit)
-		return 3*numQubits;
+	//param =  fmod(param,2*M_PI);
+	//if (param < 0)
+	//	param += 2*M_PI;
+	
+	if (DEBUG_ANSATZ_PRINT) 
+		printf("%s(%lf) | qb%d\n", gate, param, qb);
 		
-	// but you can't double this: the first numQubits are overhead!
-	if (ansatzCircuit == lowDepthChemistryAnsatzCircuit)
-		return numQubits + 5*(numQubits/2 + (numQubits-1)/2);
+}
+
+
+AnsatzCircuit getAnsatzFromString(char* string) {
+	
+	AnsatzCircuit ansatz = NULL;
+	if (strcmp(string, LOW_DEPTH_ANSATZ_STR) == 0)
+		ansatz = lowDepthChemistryAnsatzCircuit;
+		
+	else if (strcmp(string, HARDWARE_EFFICIENT_ANSATZ_STR) == 0)
+		ansatz = hardwareEfficientChemistryAnsatzCircuit;
+		
+	return ansatz;
+}
+
+int getIdealNumParamsInAnsatz(AnsatzCircuit ansatz, int numQubits) {
+	
+	// 2 blocks (first block has 3 columns, subsequent blocks have 4)
+	if (ansatz == hardwareEfficientChemistryAnsatzCircuit)
+		return (3 + 1*4)*numQubits;
+		
+	// 2 blocks (once-off initial column) 
+	if (ansatz == lowDepthChemistryAnsatzCircuit)
+		return numQubits + 2*5*(numQubits/2 + (numQubits-1)/2);
 		
 	printf("ERROR: unrecognised ansatz circuit!\n");
 	return -1;
@@ -48,25 +81,45 @@ void hardwareEfficientChemistryAnsatzCircuit(EvolverMemory *mem, MultiQubit qubi
 	
 	initState(mem, qubits);
 	
+	int block = 0;
 	int paramInd = 0;
 	
 	// loop the following circuit until all params are featured
 	while (paramInd < numParams) {
 		
+		// skip Rz column in the first block
+		if (paramInd > 0) 
+			for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++) {
+				debugPrint("RZ", params[paramInd], qb);
+				rotateZ(qubits, qb, params[paramInd++]);
+			}
+		
 		// Rx
-		for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++)
+		for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++) {
+			debugPrint("RX", params[paramInd], qb);
 			rotateX(qubits, qb, params[paramInd++]);
+		}
 		
 		// Rz
-		for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++)
+		for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++) {
+			debugPrint("RZ", params[paramInd], qb);
 			rotateZ(qubits, qb, params[paramInd++]);
+		}
 		
 		// C(Ry)
-		for (int qb=0; qb < qubits.numQubits - 1 && paramInd < numParams; qb++)
-			controlledRotateY(qubits, qb, qb+1, params[paramInd++]);
+		for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++) {
+			debugPrint("CY", params[paramInd], qb);
+			controlledRotateY(qubits, qb, (qb+block+1)%qubits.numQubits, params[paramInd++]);
+		}
 		
-		if (paramInd < numParams)
+		/*
+		if (paramInd < numParams) {
+			debugPrint("CY", params[paramInd], qubits.numQubits-1);
 			controlledRotateY(qubits, qubits.numQubits-1, 0, params[paramInd++]);
+		}
+		*/
+		
+		block++;
 	}
 }
 
@@ -107,8 +160,8 @@ void lowDepthChemistryAnsatzCircuit(EvolverMemory *mem, MultiQubit qubits, doubl
 	
 	const int numTypes = 5;
 	int types[5][2] = {{1,0}, {0,1}, {2,2}, {1,1}, {0,0}};
-	int paramInd = 0;
 	
+	int paramInd = 0;
 	// initial Rx
 	for (int qb=0; qb < qubits.numQubits && paramInd < numParams; qb++)
 		rotateX(qubits, qb, params[paramInd++]);

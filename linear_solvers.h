@@ -19,6 +19,12 @@ extern const double TIKHONOV_PARAM_SEARCH_SIZE;
  */
 extern const double TIKHONOV_REG_MIN_PARAM;
 
+/** 
+ * maximum value allowed of the Tikhonov regularisation param (weighting of min param constraint), 
+ * to ensure that the change in params remains accurate (keeping <E> above the true minimum)
+ */
+extern const double TIKHONOV_REG_MAX_PARAM;
+
 
 /**
  * provided methods for numerically solving for the change in params (pass to evolveParams)

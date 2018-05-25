@@ -27,6 +27,12 @@ const double TIKHONOV_PARAM_SEARCH_SIZE = 3; // must be >= 3
  */
 const double TIKHONOV_REG_MIN_PARAM = 0.0001;
 
+/** 
+ * maximum value allowed of the Tikhonov regularisation param (weighting of min param constraint), 
+ * to ensure that the change in params remains accurate (keeping <E> above the true minimum)
+ */
+const double TIKHONOV_REG_MAX_PARAM = 0.01;
+
 /**
  * Attempts to perform direct solving by LU decomposition, which is
  * unstable and liable to fail.
@@ -150,9 +156,11 @@ int approxParamsByTikhonov(EvolverMemory *mem) {
 		tikhonovParam = gsl_vector_get(mem->tikhonovParamSamples, tikhonovParamIndex); 
 	}
 	
-	// restrict the regularisation param from being too small (to keep ||paramChange|| small)
+	// restrict the regularisation param from being too big or small
 	if (tikhonovParam < TIKHONOV_REG_MIN_PARAM)
 		tikhonovParam = TIKHONOV_REG_MIN_PARAM;
+	if (tikhonovParam > TIKHONOV_REG_MAX_PARAM)
+		tikhonovParam = TIKHONOV_REG_MAX_PARAM;
 		
 	// the error ||C - A paramChange|| can be monitored
 	double residualNorm, paramChangeNorm;

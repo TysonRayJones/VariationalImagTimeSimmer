@@ -16,7 +16,6 @@ typedef struct {
 	// specifies the format of the stored Hamiltonian
 	hamilType type;
 	
-	
 	double* diagHamil;
 	
 	int numTerms;
@@ -33,7 +32,7 @@ typedef struct {
  * of clauses in equ that it fails. The returned Hamiltonian must eventually
  * be freed by freeHamil!
  */
-Hamiltonian load3SATHamilFromFile(
+Hamiltonian load3SATAndHamilFromFile(
 	char *filename, 
 	int **equ, int **sol,
 	int *numBools, int *numClauses
@@ -47,7 +46,7 @@ Hamiltonian load3SATHamilFromFile(
  * state (bitstring) is the number of clauses in equ that it fails. 
  * The returned Hamiltonian must eventually be freed by freeHamil!
  */
-Hamiltonian getRandom3SATHamil(
+Hamiltonian getRandom3SATAndHamil(
 	int numBools, 
 	int **equ, int **sol, int *numClauses
 );
@@ -76,12 +75,16 @@ void applyHamil(double complex* hamilState, MultiQubit qubits, Hamiltonian hamil
 
 double getExpectedEnergy(double complex* hamilState, MultiQubit qubits, Hamiltonian hamil);
 
+
+void getPauliHamilEigvals(Hamiltonian hamil, MultiQubit qubits, int numModes, double** eigvals, double complex ***eigvecs);
+
+void freePauliHamilEigvals(double *eigvals, double complex **eigvecs, int numModes);
+
 /**
  * Frees the memory allocated to a hamiltonian
  */
 void freeHamil(Hamiltonian hamil);
 
 void print3SATEquSol(int *equ, int *sol, int numBools, int numClauses);
-
 
 #endif // HAMILTONIAN_BUILDER_H_

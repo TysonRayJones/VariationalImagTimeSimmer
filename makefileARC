@@ -13,12 +13,12 @@
 COMPILER = GNU
 
 # EXECUTABLE TO GENERATE
-EXE = ScratchCode
+EXE = Variational3SATSolver
 
 # USER SOURCE FILES
 # This makefile expects all user sources to be in the root directory.
 # If using more than one source, separate by spaces
-MY_C_SOURCES = scratch_space param_evolver hamiltonian_builder sat_generator mmaformatter ansatz_circuits linear_solvers 
+MY_C_SOURCES = variational_3SAT_solver ansatz_circuits linear_solvers param_evolver true_evolver hamiltonian_builder sat_generator mmaformatter
 
 # ENABLE DISTRIBUTED PROCESSING (ALLOWS MULTIPLE NODES)
 # On: 1, Off: 0
@@ -48,7 +48,7 @@ QUEST_DIR = QuEST
 ifneq ($(USE_MPI), 1)
 	ifeq ($(COMPILER), GNU)
 		# COMPILER = GNU
-		CC = /usr/local/bin/gcc-4.9
+		CC = gcc
 	else ifeq ($(COMPILER), INTEL)
 		# COMPILER = INTEL
 		CC = icc
@@ -92,6 +92,14 @@ else
 endif
 
 
+
+#
+# --- GSL link
+#
+GSL_INCLUDE = -I/data/oums-quantopo/corp2627/gsl/include
+GSL_LINK = -L/data/oums-quantopo/corp2627/gsl/lib
+
+
 #
 # --- libraries
 #
@@ -119,10 +127,10 @@ endif
 # --- rules
 #
 %.o: %.c
-	$(CC) $(INCLUDE) $(CFLAGS) $(CFLAGS_OMP) -c $<
+	$(CC) $(INCLUDE) $(CFLAGS) $(CFLAGS_OMP) $(GSL_INCLUDE) -c $<
 
 %.o: $(QUEST_DIR)/%.c
-	$(CC) $(CFLAGS) $(CFLAGS_OMP) -c $<
+	$(CC) $(CFLAGS) $(CFLAGS_OMP) $(GSL_INCLUDE) -c $<
 
 
 #
@@ -131,7 +139,7 @@ endif
 default:	$(EXE)
 
 $(EXE):		$(OBJ)
-		$(CC) $(INCLUDE) $(CFLAGS) $(CFLAGS_OMP) -o $(EXE) $(OBJ) $(LIBS)
+		$(CC) $(INCLUDE) $(CFLAGS) $(CFLAGS_OMP) $(GSL_INCLUDE) -o $(EXE) $(OBJ) $(LIBS) $(GSL_LINK)
 
 .PHONY:		clean veryclean
 clean:

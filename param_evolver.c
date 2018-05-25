@@ -23,11 +23,10 @@
 int NUM_ITERS_IN_STUCK_CHECK = 2;
 
 /** simulation converged when sum of |dparam_i| < this */
-double MAX_PARAM_CHANGE_WHEN_STUCK = 1E-3;
-
+double MAX_PARAM_CHANGE_WHEN_STUCK = 1E-2;
 
 /** size of the change in parameter when approxing wavefunction derivatives */
-double DERIV_STEP_SIZE = 1E-8; 
+double DERIV_STEP_SIZE = 1E-5; // 1E-8; 
 
 /** finite-dif first deriv coefficients of psi(x+nh) for n > 0, or -1*(that for n < 0) */
 double FINITE_DIFFERENCE_COEFFS[4][4] = {
@@ -157,7 +156,7 @@ void exciteSavedStatesInDerivMatrices(EvolverMemory *mem, MultiQubit qubits) {
 			double complex saveProjOnDeriv = innerProduct(mem->derivs[i], mem->savedStates[s], qubits.numAmps);
 			
 			double currC = gsl_vector_get(mem->vecC, i);
-			double newC = currC - creal(saveProjOnDeriv * saveProjOnQubits) *  EXCITATION_OF_SAVED_STATES;
+			double newC = currC - creal(saveProjOnDeriv * saveProjOnQubits) * EXCITATION_OF_SAVED_STATES;
 			gsl_vector_set(mem->vecC, i, newC);
 		}
 	}
@@ -223,7 +222,7 @@ void addNoiseToDerivMatrices(EvolverMemory *mem, double fractionalVar) {
   * @return SUCCESS 				indicates numerical updating (by inversionMethod) of the params worked 
   * @return FAILED					indicates inversionMethod failed
   */
-evolveOutcome evolveParams(
+evolveOutcome evolveParamsByImaginaryTime(
 	EvolverMemory *mem, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	int (*inversionMethod)(EvolverMemory*),
@@ -272,10 +271,16 @@ evolveOutcome evolveParamsByGradientDescent(
 	EvolverMemory *mem, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, int wrapParams,
-	int derivAccuracy) 
+	int derivAccuracy, double matrNoise) 
 {
 	// compute matrices A and C
 	computeDerivMatrices(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+	
+	// morph C to excite Hamiltonain states
+	exciteSavedStatesInDerivMatrices(mem, qubits);
+	
+	// add a little noise to A and C
+	addNoiseToDerivMatrices(mem, matrNoise);
 	
 	// update params
 	for (int i=0; i < mem->numParams; i++)
@@ -300,6 +305,36 @@ evolveOutcome evolveParamsByGradientDescent(
  * evolution is stopped if, for each of the last NUM_ITERS_IN_STUCK_CHECK iterations, 
  * the sum of (absolute) changes of the parameters is less than MAX_PARAM_CHANGE_WHEN_STUCK
  */
+int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration) {
+
+	// if too few iterations have happened, we're not stuck
+	if (iteration < NUM_ITERS_IN_STUCK_CHECK + 1)
+		return 0;
+		
+	// paramEvo[sims][params][iter]
+	for (int i=iteration-NUM_ITERS_IN_STUCK_CHECK; i < iteration; i++) {
+		
+		// calculate |dp1| + |dp2| + .... for this iteration
+		double paramVecChange = 0;
+		
+		for (int n=0; n < numParams; n++) {
+			double currVal = paramEvo[simIteration][n][iteration];
+			double prevVal = paramEvo[simIteration][n][iteration - 1];
+			paramVecChange += fabs(currVal - prevVal);
+		}
+		
+		// not stuck if params change enough in any iteration in the considered window
+		if (paramVecChange > MAX_PARAM_CHANGE_WHEN_STUCK)
+			return 0;
+	}
+	
+	// paramChange is small in all considered iterations: we're stuck!
+	return 1;
+}
+ 
+ 
+// this is for an array paramEvo, not pointers
+/*
 int isStuck(double* paramEvo, int simIteration, int numParams, int numIterations, int iteration) {
 	
 	// if too few iterations have happened, we're not stuck
@@ -329,6 +364,7 @@ int isStuck(double* paramEvo, int simIteration, int numParams, int numIterations
 	// paramChange is small in all considered iterations: we're stuck!
 	return 1;
 }
+*/
 
 
 /**

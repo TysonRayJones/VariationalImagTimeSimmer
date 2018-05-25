@@ -48,7 +48,7 @@ QUEST_DIR = QuEST
 ifneq ($(USE_MPI), 1)
 	ifeq ($(COMPILER), GNU)
 		# COMPILER = GNU
-		CC = /usr/local/bin/gcc-4.9
+		CC = gcc
 	else ifeq ($(COMPILER), INTEL)
 		# COMPILER = INTEL
 		CC = icc

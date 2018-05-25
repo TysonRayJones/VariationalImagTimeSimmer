@@ -57,6 +57,7 @@ typedef struct {
 	
 } EvolverMemory;
 
+
 /** flags which indicate the success of inversionMethod passed to evolveParams */
 typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
 
@@ -91,7 +92,7 @@ typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
   * @return SUCCESS 				indicates numerical updating (by inversionMethod) of the params worked 
   * @return FAILED					indicates inversionMethod failed
   */
-evolveOutcome evolveParams(
+evolveOutcome evolveParamsByImaginaryTime(
 	EvolverMemory *mem, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	int (*inversionMethod)(EvolverMemory*),
@@ -106,14 +107,15 @@ evolveOutcome evolveParams(
 evolveOutcome evolveParamsByGradientDescent(
 	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	MultiQubit qubits, double* params, Hamiltonian hamil, 
-	double timeStepSize, int wrapParams, int derivAccuracy);
+	double timeStepSize, int wrapParams, int derivAccuracy, double matrNoise);
 	
 /**
  * returns whether the current simulation has halted, based on the evolution of the parameters
  * evolution is stopped if, for each of the last NUM_ITERS_IN_STUCK_CHECK iterations, 
  * the sum of (absolute) changes of the parameters is less than MAX_PARAM_CHANGE_WHEN_STUCK
  */
-int isStuck(double* paramEvo, int simIteration, int numParams, int numIterations, int iteration);
+int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration);
+//int isStuck(double* paramEvo, int simIteration, int numParams, int numIterations, int iteration);
 
 /**
  * Allocates memory for the data structures needed by the evolveParams function,

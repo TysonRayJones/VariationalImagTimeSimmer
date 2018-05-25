@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "mmaformatter.h"
 
@@ -204,7 +205,7 @@ void writeNestedDoubleList(
 	for (int i=0; i < lengths[lengthInd]; i++) {
 		
 		// and write each elem (possibly a pointer) as a list
-		writeNestedDoubleList(file, *((double **) arr), numDimensions-1, lengths, lengthInd+1, precision);
+		writeNestedDoubleList(file, ((double **) arr)[i], numDimensions-1, lengths, lengthInd+1, precision);
 		
 		// seperate elements
 		fprintf(file, ",\n");

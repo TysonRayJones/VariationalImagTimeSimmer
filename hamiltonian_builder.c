@@ -7,6 +7,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <complex.h>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_complex.h>
+#include <gsl/gsl_complex_math.h>
+#include <gsl/gsl_eigen.h>
 
 #include "sat_generator.h"
 #include "hamiltonian_builder.h"
@@ -17,7 +22,7 @@
  * where the energy of a state (bitstring) is the total number of
  * clauses that it fails. The returned hamiltonian must be freed!
  */
-double* getHamiltonianFrom3SAT(int* equ, int numBools, int numClauses) {
+double* getDiagHamilFrom3SAT(int* equ, int numBools, int numClauses) {
 	
 	long long int length = pow(2LL, numBools);
 	double* hamiltonian = malloc(length * sizeof *hamiltonian);
@@ -68,7 +73,7 @@ double* getHamiltonianFrom3SAT(int* equ, int numBools, int numClauses) {
  * hamiltonian (setting hamil) where the energy of a state (bitstring) is the number
  * of clauses in equ that it fails. equ, sol and hamil must be freed!
  */
-Hamiltonian load3SATHamilFromFile(
+Hamiltonian load3SATAndHamilFromFile(
 	char *filename, 
 	int **equ, int **sol,
 	int *numBools, int *numClauses
@@ -88,7 +93,12 @@ Hamiltonian load3SATHamilFromFile(
 	hamil.type = DIAGONAL;
 	hamil.numQubits = *numBools;
 	hamil.numAmps = pow(2LL, *numBools);
-	hamil.diagHamil = getHamiltonianFrom3SAT(*equ, *numBools, *numClauses);
+	hamil.diagHamil = getDiagHamilFrom3SAT(*equ, *numBools, *numClauses);
+	
+	hamil.terms = NULL;
+	hamil.termCoeffs = NULL;
+	hamil.numTerms = -1;
+	
 	return hamil;
 	
 	// equ, sol, hamiltonian must be freed!
@@ -102,7 +112,7 @@ Hamiltonian load3SATHamilFromFile(
  * state (bitstring) is the number of clauses in equ that it fails. 
  * equ, sol and hamil must be freed!
  */
-Hamiltonian getRandom3SATHamil(
+Hamiltonian getRandom3SATAndHamil(
 	int numBools, 
 	int **equ, int **sol, int *numClauses
 ) {
@@ -113,7 +123,12 @@ Hamiltonian getRandom3SATHamil(
 	hamil.type = DIAGONAL;
 	hamil.numQubits = numBools;
 	hamil.numAmps = pow(2LL, numBools);
-	hamil.diagHamil = getHamiltonianFrom3SAT(*equ, numBools, *numClauses);
+	hamil.diagHamil = getDiagHamilFrom3SAT(*equ, numBools, *numClauses);
+	
+	hamil.terms = NULL;
+	hamil.termCoeffs = NULL;
+	hamil.numTerms = -1;
+	
 	return hamil;
 	
 	// equ, sol hamiltonian must be freed!
@@ -152,7 +167,7 @@ void printDiagHamil(double* hamil, long long int length) {
 
 
 
-int getHamilFromFile(char *filename, double** coeffs, int*** terms, int *numTerms, int *numQubits) {
+int getPauliHamilFromFile(char *filename, double** coeffs, int*** terms, int *numTerms, int *numQubits) {
 	
 	/*
 	 * file format: coeff {term} \n where {term} is #numQubits values of 
@@ -211,7 +226,7 @@ Hamiltonian loadPauliHamilFromFile(char *filename) {
 
 	Hamiltonian hamil;
 	hamil.type = PAULI_TERMS;
-	getHamilFromFile(filename, &hamil.termCoeffs, &hamil.terms, &hamil.numTerms, &hamil.numQubits);
+	getPauliHamilFromFile(filename, &hamil.termCoeffs, &hamil.terms, &hamil.numTerms, &hamil.numQubits);
 	hamil.numAmps = pow(2LL, hamil.numQubits);
 	
 	return hamil;
@@ -327,34 +342,105 @@ void applyHamil(double complex* hamilState, MultiQubit qubits, Hamiltonian hamil
 }
 
 
-
-double getExpectedEnergyDiag(MultiQubit qubits, double *hamil, long long int stateSize) {
-	
-	double energy = 0;
-	for (long long int i=0LL; i < stateSize; i++)
-		energy += getProbEl(qubits, i)*hamil[i];
-		
-	return energy;
-}
-
-
 double getExpectedEnergy(double complex* hamilState, MultiQubit qubits, Hamiltonian hamil) {
 	
-	if (hamil.type == DIAGONAL)
-		return getExpectedEnergyDiag(qubits, hamil.diagHamil, hamil.numAmps);
+	if (hamil.type == DIAGONAL) {
+		double energy = 0;
+		for (long long int i=0LL; i < hamil.numAmps; i++)
+			energy += getProbEl(qubits, i)*hamil.diagHamil[i];
+		return energy;
+	}
 	
 	if (hamil.type == PAULI_TERMS) {
 		// if <E> hasn't changed much from prev, previous hamilState is a good estimate
-		//applyPauliHamil(hamilState, qubits, hamil.termCoeffs, hamil.terms, hamil.numTerms);
+		applyPauliHamil(hamilState, qubits, hamil.termCoeffs, hamil.terms, hamil.numTerms);
 		double innerprod = 0;
-		for (long long int i=0LL; i < qubits.numAmps; i++)
+		for (long long int i=0LL; i < hamil.numAmps; i++)
 			innerprod += creal(
 				(getRealAmpEl(qubits, i) - I*getImagAmpEl(qubits, i)) *
-				hamilState[i]
-			);
+				hamilState[i]);
 		return innerprod;
 	}
 	
 	printf("If you see this message, something has truly crapped up\n");
 	return -666;
+}
+
+
+
+gsl_matrix_complex* getMatrixFromPauliHamil(Hamiltonian hamil, MultiQubit qubits) {
+	
+	double complex* hamilState = malloc(hamil.numAmps * sizeof *hamilState);
+	
+	gsl_matrix_complex* matr = gsl_matrix_complex_calloc(hamil.numAmps, hamil.numAmps);
+	if (hamil.type == DIAGONAL)
+		return matr;
+	
+	for (long long i=0; i < hamil.numAmps; i++) {
+		initClassicalState(&qubits, i);
+		applyHamil(hamilState, qubits, hamil);
+		
+		for (long long j=0; j < hamil.numAmps; j++)
+			gsl_matrix_complex_set(matr, i, j, gsl_complex_rect(creal(hamilState[j]), cimag(hamilState[j])));
+	}
+	
+	free(hamilState);
+
+	return matr;
+}
+
+
+void getPauliHamilEigvals(Hamiltonian hamil, MultiQubit qubits, int numModes, double** eigvals, double complex ***eigvecs) {
+	
+	// passing 0 means all modes are desired
+	if (numModes == 0)
+		numModes = hamil.numAmps;
+	
+	// get matrix Hamiltonian
+	gsl_matrix_complex* hamilMatr = getMatrixFromPauliHamil(hamil, qubits);
+	
+	// make GSL space for eigenvals and eigenvectors
+	gsl_eigen_hermv_workspace* space = gsl_eigen_hermv_alloc(hamil.numAmps);
+	gsl_vector* eigValsVec = gsl_vector_alloc(hamil.numAmps);
+	gsl_matrix_complex *eigVecsMatr = gsl_matrix_complex_alloc(hamil.numAmps, hamil.numAmps); 
+	
+	// diagaonlise Hamiltonian
+	int failed = gsl_eigen_hermv(hamilMatr, eigValsVec, eigVecsMatr, space);
+	if (failed)
+		printf("WTF diagonalisation failed\n");
+	
+	// sort spectrum by increasing energy
+	gsl_eigen_genhermv_sort(eigValsVec, eigVecsMatr, GSL_EIGEN_SORT_VAL_ASC);
+	
+	// copy from GSL objects to pointers
+	*eigvals = malloc(numModes * sizeof **eigvals);
+	for (int i=0; i < numModes; i++)
+		(*eigvals)[i] = gsl_vector_get(eigValsVec, i);
+		
+	*eigvecs = malloc(numModes * sizeof **eigvecs);
+	for (int i=0; i < numModes; i++) {
+		(*eigvecs)[i] = malloc(hamil.numAmps * sizeof ***eigvecs);
+		for (int j=0; j < hamil.numAmps; j++) {
+			gsl_complex val = gsl_matrix_complex_get(eigVecsMatr, j, i);
+			(*eigvecs)[i][j] = GSL_REAL(val) + I*GSL_IMAG(val);
+		}
+	}
+	
+	// free GSL objects
+	gsl_eigen_hermv_free(space);
+	gsl_matrix_complex_free(hamilMatr);
+	gsl_vector_free(eigValsVec);
+	gsl_matrix_complex_free(eigVecsMatr);
+}
+
+
+
+
+
+void freePauliHamilEigvals(double *eigvals, double complex **eigvecs, int numModes) {
+	
+	free(eigvals);
+	for (int i=0; i < numModes; i++)
+		free(eigvecs[i]);
+	free(eigvecs);
 }

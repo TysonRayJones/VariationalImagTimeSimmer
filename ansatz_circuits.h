@@ -7,6 +7,10 @@
 #include "param_evolver.h"
 
 
+typedef void (*AnsatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int);
+
+AnsatzCircuit getAnsatzFromString(char* string);
+
 /**
  * Call after preparing qubits in the desired state to feed into
  * the ansatz at every evolution.
@@ -17,7 +21,7 @@ void setAnsatzInitState(EvolverMemory *mem, MultiQubit qubits);
 void hardwareEfficientChemistryAnsatzCircuit(EvolverMemory *mem, MultiQubit qubits, double* params, int numParams);
 void lowDepthChemistryAnsatzCircuit(EvolverMemory *mem, MultiQubit qubits, double* params, int numParams);
 
-int getIdealNumParamsInAnsatz(void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), int numQubits);
+int getIdealNumParamsInAnsatz(AnsatzCircuit ansatz, int numQubits);
 
 
 #endif // ANSATZ_CIRCUITS_H_
