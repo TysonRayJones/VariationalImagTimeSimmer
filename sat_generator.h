@@ -2,7 +2,7 @@
 #define SAT_GEN_H_
 
 
-int *loadEquation(char *filename, int *numBools, int *numClauses);
+int *loadEquation(char *filename, int *numBools, int *numClauses, int *failed);
 
 void saveEquation(char *filename, int *equ, int numClauses);
 

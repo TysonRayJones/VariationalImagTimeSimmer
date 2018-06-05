@@ -76,11 +76,12 @@ double* getDiagHamilFrom3SAT(int* equ, int numBools, int numClauses) {
 Hamiltonian load3SATAndHamilFromFile(
 	char *filename, 
 	int **equ, int **sol,
-	int *numBools, int *numClauses
+	int *numBools, int *numClauses,
+	int *failed
 ) {
 	
 	// load the equation, infer numBools and numClauses
-	*equ = loadEquation(filename, numBools, numClauses);
+	*equ = loadEquation(filename, numBools, numClauses, failed);
 	
 	// generate the solution
 	*sol = malloc(*numBools * sizeof(int));
@@ -189,10 +190,11 @@ int getPauliHamilFromFile(char *filename, double** coeffs, int*** terms, int *nu
 			
 	// count the number of terms
 	rewind(file);
-	*numTerms = 0;
+	*numTerms = 1;
 	while ((ch=getc(file)) != EOF)
 		if (ch == '\n')
 			*numTerms += 1;
+	
 	
 	// collect coefficients and terms
 	rewind(file);
@@ -222,11 +224,11 @@ int getPauliHamilFromFile(char *filename, double** coeffs, int*** terms, int *nu
 }
 
 
-Hamiltonian loadPauliHamilFromFile(char *filename) {
+Hamiltonian loadPauliHamilFromFile(char *filename, int *failed) {
 
 	Hamiltonian hamil;
 	hamil.type = PAULI_TERMS;
-	getPauliHamilFromFile(filename, &hamil.termCoeffs, &hamil.terms, &hamil.numTerms, &hamil.numQubits);
+	*failed = getPauliHamilFromFile(filename, &hamil.termCoeffs, &hamil.terms, &hamil.numTerms, &hamil.numQubits);
 	hamil.numAmps = pow(2LL, hamil.numQubits);
 	
 	return hamil;
@@ -275,7 +277,6 @@ void printHamil(Hamiltonian hamil) {
 }
 
 
-
 void freeHamil(Hamiltonian hamil) {
 	
 	if (hamil.type == DIAGONAL) {
@@ -288,6 +289,27 @@ void freeHamil(Hamiltonian hamil) {
 			free(hamil.terms[t]);
 		free(hamil.terms);
 	}
+}
+
+
+
+double getStableImagTimestep(Hamiltonian hamil) {
+	
+	double maxEigVal = 0;
+	
+	if (hamil.type == DIAGONAL) {
+		
+		for (long long int i=0LL; i <hamil.numAmps; i++)
+			if (hamil.diagHamil[i] > maxEigVal)
+				maxEigVal = hamil.diagHamil[i];
+	}
+	if (hamil.type == PAULI_TERMS) {
+		
+		printf("ERROR! Haven't yet refactored the spectrum to live in hamiltonian_builder\n");
+		return -1;
+	}
+			
+	return 1/maxEigVal;
 }
 
 

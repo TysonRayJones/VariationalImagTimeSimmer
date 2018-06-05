@@ -20,13 +20,15 @@
 #include "linear_solvers.h"
 
 /** number of contiguous iterations considered when checking convergence */
-int NUM_ITERS_IN_STUCK_CHECK = 2;
-
-/** simulation converged when sum of |dparam_i| < this */
-double MAX_PARAM_CHANGE_WHEN_STUCK = 1E-2;
+const int NUM_ITERS_IN_STUCK_CHECK = 2;
 
 /** size of the change in parameter when approxing wavefunction derivatives */
-double DERIV_STEP_SIZE = 1E-5; // 1E-8; 
+const double DERIV_STEP_SIZE = 1E-5; // 1E-8; 
+
+const int MAX_NUM_SAVED_STATES = 1000;
+const double EXCITATION_OF_SAVED_STATES = 10;
+
+
 
 /** finite-dif first deriv coefficients of psi(x+nh) for n > 0, or -1*(that for n < 0) */
 double FINITE_DIFFERENCE_COEFFS[4][4] = {
@@ -37,9 +39,6 @@ double FINITE_DIFFERENCE_COEFFS[4][4] = {
 };
 // https://en.wikipedia.org/wiki/Finite_difference_coefficient
 
-int MAX_NUM_SAVED_STATES = 100;
-
-double EXCITATION_OF_SAVED_STATES = 10;
 
 
 /**
@@ -305,7 +304,7 @@ evolveOutcome evolveParamsByGradientDescent(
  * evolution is stopped if, for each of the last NUM_ITERS_IN_STUCK_CHECK iterations, 
  * the sum of (absolute) changes of the parameters is less than MAX_PARAM_CHANGE_WHEN_STUCK
  */
-int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration) {
+int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration, double paramChangeThreshold) {
 
 	// if too few iterations have happened, we're not stuck
 	if (iteration < NUM_ITERS_IN_STUCK_CHECK + 1)
@@ -324,7 +323,7 @@ int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration) 
 		}
 		
 		// not stuck if params change enough in any iteration in the considered window
-		if (paramVecChange > MAX_PARAM_CHANGE_WHEN_STUCK)
+		if (paramVecChange > paramChangeThreshold)
 			return 0;
 	}
 	

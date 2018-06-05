@@ -6,6 +6,14 @@
  * tyson.jones@materials.ox.ac.uk
  */
  
+ 
+/*
+ * BUGS! Methods with a "write every element trailing comma, then delete trailing comma"
+ * method will fail for empty lists
+ * (This'll result in Get failing inside Mathematica)
+ */
+
+ 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,6 +166,37 @@ void writeIntArrToAssoc(FILE* file, char* keyname, int* arr, int length) {
 }
 
 
+void writeUnevenOnceNestedIntArrToAssoc(FILE* file, char* keyname, int (*arr)[], int outerLength, int* innerLengths, int innerSpace) {
+	
+	// open outer list
+	fprintf(file, "\"%s\" -> {\n", keyname);
+	
+	int* flatArr = (int *) arr;
+	for (int outer=0; outer < outerLength; outer++) {
+		
+		// open inner list
+		fprintf(file, "{");
+		
+		// write inner list
+		for (int inner=0; inner < innerLengths[outer]; inner++)
+			fprintf(file, "%d, ", *((flatArr+outer*innerSpace) + inner));
+		
+		// remove trailing comma and space (note, not written for empty lists)
+		if (innerLengths[outer] > 0)
+			fseek(file, -2, SEEK_END);
+		
+		// close inner list
+		fprintf(file, "},\n");
+	}
+	
+	// remove trailing comma and newline
+	fseek(file, -2, SEEK_END);
+	
+	// close outer list
+	fprintf(file, "\n},\n");
+}
+
+
 void writeDoubleArrToAssoc(FILE* file, char* keyname, double* arr, int length, int precision) {
 	
 	char* arrStr = convertDoubleArrToMMA(arr, length, precision);
@@ -169,13 +208,36 @@ void writeDoubleArrToAssoc(FILE* file, char* keyname, double* arr, int length, i
 void writeOnceNestedDoubleListToAssoc(
 	FILE* file, char* keyname, double** arr, int outerLength, int innerLength, int precision) 
 {
-	
 	// open outer list
 	fprintf(file, "\"%s\" -> {\n", keyname);
 	
 	// write each inner list to file with trailing comma and newline
 	for (int i=0; i < outerLength; i++) {
 		char* arrStr = convertDoubleArrToMMA(arr[i], innerLength, precision);
+		fprintf(file, "%s,\n", arrStr);
+		free(arrStr);
+	}
+	
+	// delete trailing newline, comma
+	fseek(file, -2, SEEK_END);
+	
+	// closer outer list
+	fprintf(file, "\n},\n");
+}
+
+
+void writeUnevenOnceNestedDoubleArrToAssoc(
+	FILE* file, char* keyname, double (*arr)[], int outerLength, int* innerLengths, int innerSpace, int precision) 
+{
+	// open outer list
+	fprintf(file, "\"%s\" -> {\n", keyname);
+	
+	// flatten list
+	double* flatArr = (double *) arr;
+	
+	// write each inner list to file with trailing comma and newline
+	for (int outer=0; outer < outerLength; outer++) {
+		char* arrStr = convertDoubleArrToMMA((flatArr+outer*innerSpace), innerLengths[outer], precision);
 		fprintf(file, "%s,\n", arrStr);
 		free(arrStr);
 	}

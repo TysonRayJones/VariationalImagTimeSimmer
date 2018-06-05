@@ -16,8 +16,10 @@ typedef struct {
 	// specifies the format of the stored Hamiltonian
 	hamilType type;
 	
+	// 3SAT diagonal Hamiltonian
 	double* diagHamil;
 	
+	// Chemistry pauli-terms Hamiltonian
 	int numTerms;
 	double* termCoeffs;
 	int** terms;
@@ -35,7 +37,8 @@ typedef struct {
 Hamiltonian load3SATAndHamilFromFile(
 	char *filename, 
 	int **equ, int **sol,
-	int *numBools, int *numClauses
+	int *numBools, int *numClauses,
+	int *failed
 );
 
 
@@ -59,7 +62,7 @@ Hamiltonian getRandom3SATAndHamil(
  * and numbers 0,1,2,3 correspond to gates I,X,Y,Z on that index qubit.
  * The returned Hamiltonian must eventually be freed by freeHamil!
  */
-Hamiltonian loadPauliHamilFromFile(char *filename);
+Hamiltonian loadPauliHamilFromFile(char *filename, int* failed);
 
 /**
  * Prints a Hamiltonian. The format depends on the type of Hamiltonian
@@ -68,16 +71,30 @@ Hamiltonian loadPauliHamilFromFile(char *filename);
 void printHamil(Hamiltonian hamil);
 
 /**
+ * Returns a suitably stable time-step for imaginary propogation
+ */
+double getStableImagTimestep(Hamiltonian hamil);
+
+/**
  * Modifies hamilState to be the result of applying hamil to qubits.
  * qubits should remain unchanged, though may slightly vary due to numerical imprecision
  */
 void applyHamil(double complex* hamilState, MultiQubit qubits, Hamiltonian hamil);
 
+/**
+ * Returns the expected or average energy of a qubit state under the given Hamiltonian
+ */
 double getExpectedEnergy(double complex* hamilState, MultiQubit qubits, Hamiltonian hamil);
 
-
+/** 
+ * Diagonalises a Hamiltonian specified as pauli terms
+ * Arrays must be freed
+ */
 void getPauliHamilEigvals(Hamiltonian hamil, MultiQubit qubits, int numModes, double** eigvals, double complex ***eigvecs);
 
+/**
+ * Frees the arrays storing the spectrum of a Hamiltonian of pauli terms
+ */
 void freePauliHamilEigvals(double *eigvals, double complex **eigvecs, int numModes);
 
 /**

@@ -11,6 +11,17 @@
 #include "hamiltonian_builder.h"
 
 
+/** number of contiguous iterations considered when checking convergence */
+extern const int NUM_ITERS_IN_STUCK_CHECK;
+
+/** size of the change in parameter when approxing wavefunction derivatives */
+extern const double DERIV_STEP_SIZE;
+
+extern const int MAX_NUM_SAVED_STATES;
+extern const double EXCITATION_OF_SAVED_STATES;
+
+
+
 /**
  * A container for the memory used by evolveParams. Is to be created once
  * via prepareEvolverMemory and passed to calls to evolveParams,
@@ -114,7 +125,7 @@ evolveOutcome evolveParamsByGradientDescent(
  * evolution is stopped if, for each of the last NUM_ITERS_IN_STUCK_CHECK iterations, 
  * the sum of (absolute) changes of the parameters is less than MAX_PARAM_CHANGE_WHEN_STUCK
  */
-int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration);
+int isStuck(double*** paramEvo, int simIteration, int numParams, int iteration, double paramChangeThreshold);
 //int isStuck(double* paramEvo, int simIteration, int numParams, int numIterations, int iteration);
 
 /**
@@ -137,6 +148,11 @@ void clearExcitedStates(EvolverMemory *memory);
  * This should be done when there are no more calls to evolveParams
  */
 void freeEvolverMemory(EvolverMemory *memory);
+
+
+
+/** needed by variational to project state on spectrum */
+double complex innerProductOnQubits(double complex* vec1, MultiQubit qubits, long long int length);
 
 
 #endif // PARAM_EVOLVER_H_

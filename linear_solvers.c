@@ -12,7 +12,7 @@
 #include "param_evolver.h"
 
 /** when approx'ing param change by TSVD, truncate SVs smaller than below*max */
-const double DEFAULT_SVD_TOLERANCE = 0.01;
+const double DEFAULT_SVD_TOLERANCE = 0.001;
 
 /** 
  * when approx'ing the param change by Tikhonov regularisation, this decides

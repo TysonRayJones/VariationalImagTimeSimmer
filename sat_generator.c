@@ -21,7 +21,7 @@
  */
 
 
-int *loadEquation(char *filename, int *numBools, int *numClauses) {
+int *loadEquation(char *filename, int *numBools, int *numClauses, int *failed) {
 	/*
 	 * reads N-SAT equation from file, indexed-from-1
 	 * mallocs an array; must be freed by caller.
@@ -30,6 +30,11 @@ int *loadEquation(char *filename, int *numBools, int *numClauses) {
 	*numBools = 0;
 	*numClauses = 0;
 	FILE *file = fopen(filename, "r");
+	if (file == NULL) {
+		*failed=1;
+		return NULL;
+	}
+	
 	
 	// count parameters in equation
 	int ind = 0, qb = 0;
@@ -49,6 +54,7 @@ int *loadEquation(char *filename, int *numBools, int *numClauses) {
 		fscanf(file, "%d", &equ[ind]);
 		
 	fclose(file);
+	*failed=0;
 	return equ;
 }
 

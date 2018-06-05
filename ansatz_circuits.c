@@ -112,13 +112,6 @@ void hardwareEfficientChemistryAnsatzCircuit(EvolverMemory *mem, MultiQubit qubi
 			controlledRotateY(qubits, qb, (qb+block+1)%qubits.numQubits, params[paramInd++]);
 		}
 		
-		/*
-		if (paramInd < numParams) {
-			debugPrint("CY", params[paramInd], qubits.numQubits-1);
-			controlledRotateY(qubits, qubits.numQubits-1, 0, params[paramInd++]);
-		}
-		*/
-		
 		block++;
 	}
 }
