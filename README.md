@@ -1,3 +1,13 @@
+> The below instructions are out of date, since the interface has become more flexible.
+> See [hamiltonian_builder.h](hamiltonian_builder.h) for creating a Hamiltonian, and see the 
+> ```C
+> /*
+>  * PERFORM SIMULATION
+>  */
+> ```
+> section of [variational_3SAT_solver.c](variational_3SAT_solver.c) to see an example of how to use [param_evolver.h](param_evolver.h).
+> Feel free to contact me (via the email address advertised at [qtechtheory.org/tyson.jones](https://qtechtheory.org/person/tyson.jones/)) with questions and guidance.
+
 Variational Imag-Time 3SAT Solver
 ========
 
