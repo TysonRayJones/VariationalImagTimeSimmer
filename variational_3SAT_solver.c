@@ -19,8 +19,8 @@
 #define DIAGONALISE_HAMILTONIAN 1
 #define NUM_EIGSTATES_TO_SAVE 20
 
-#define RECORD_SPECTRUM_PROJECTIONS 0
-#define NUM_EIGSTATES_TO_RECORD_PROJS 15
+#define RECORD_SPECTRUM_PROJECTIONS 1
+#define NUM_EIGSTATES_TO_RECORD_PROJS 10
 
 /** max energy distance beteween non-degen eigvals for compactifying */
 #define DEGEN_EIGVAL_MAX_DIST 0.01
@@ -820,8 +820,11 @@ int main(int narg, char *varg[]) {
 		writeDoubleToAssoc(file, "DERIV_STEP_SIZE", DERIV_STEP_SIZE, 15);
 		writeIntToAssoc(file, "MAX_NUM_SAVED_STATES", MAX_NUM_SAVED_STATES);
 		writeDoubleToAssoc(file, "EXCITATION_OF_SAVED_STATES", EXCITATION_OF_SAVED_STATES, 10);
-		writeIntToAssoc(file, "ENERGY_TO_GROUND_MAX_DIST", ENERGY_TO_GROUND_MAX_DIST);
+		writeDoubleToAssoc(file, "ENERGY_TO_GROUND_MAX_DIST", ENERGY_TO_GROUND_MAX_DIST, 10);
 		writeIntToAssoc(file, "DIAGONALISE_HAMILTONIAN", DIAGONALISE_HAMILTONIAN);
+		
+		writeDoubleToAssoc(file, "TIKHONOV_REG_MIN_PARAM", TIKHONOV_REG_MIN_PARAM, 10);
+		writeDoubleToAssoc(file, "TIKHONOV_REG_MAX_PARAM", TIKHONOV_REG_MAX_PARAM, 10);
 		
 		// solution, energy, param evolution
 		writeNestedDoubleArrToAssoc(file, "expectedEnergyEvos", expectedEnergyEvo, 2, (int []) {simRepetitions, maxIterations+1}, maxIterations+1, 10);
