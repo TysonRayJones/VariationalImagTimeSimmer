@@ -98,6 +98,7 @@ Hamiltonian load3SATAndHamilFromFile(
 	
 	hamil.terms = NULL;
 	hamil.termCoeffs = NULL;
+    hamil.termCoeffSquaredSum = 0;
 	hamil.numTerms = -1;
 	
 	return hamil;
@@ -128,6 +129,7 @@ Hamiltonian getRandom3SATAndHamil(
 	
 	hamil.terms = NULL;
 	hamil.termCoeffs = NULL;
+    hamil.termCoeffSquaredSum = 0;
 	hamil.numTerms = -1;
 	
 	return hamil;
@@ -230,6 +232,11 @@ Hamiltonian loadPauliHamilFromFile(char *filename, int *failed) {
 	hamil.type = PAULI_TERMS;
 	*failed = getPauliHamilFromFile(filename, &hamil.termCoeffs, &hamil.terms, &hamil.numTerms, &hamil.numQubits);
 	hamil.numAmps = pow(2LL, hamil.numQubits);
+    
+    hamil.termCoeffSquaredSum = 0;
+    if (! *failed)
+        for (int i=0; i < hamil.numTerms; i++)
+            hamil.termCoeffSquaredSum += (hamil.termCoeffs[i] * hamil.termCoeffs[i]);
 	
 	return hamil;
 }

@@ -25,13 +25,13 @@ const double TIKHONOV_PARAM_SEARCH_SIZE = 3; // must be >= 3
  * minimum value allowed of the Tikhonov regularisation param (weighting of min param constraint), 
  * to ensure that the optimal value doesn't cause too large a change in params
  */
-const double TIKHONOV_REG_MIN_PARAM = 0.0001;
+const double TIKHONOV_REG_MIN_PARAM = 0.00001;
 
 /** 
  * maximum value allowed of the Tikhonov regularisation param (weighting of min param constraint), 
  * to ensure that the change in params remains accurate (keeping <E> above the true minimum)
  */
-const double TIKHONOV_REG_MAX_PARAM = 0.01;
+const double TIKHONOV_REG_MAX_PARAM = 0.001;
 
 /**
  * Attempts to perform direct solving by LU decomposition, which is

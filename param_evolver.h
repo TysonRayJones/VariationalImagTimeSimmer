@@ -22,6 +22,8 @@ extern const double EXCITATION_OF_SAVED_STATES;
 
 
 
+
+
 /**
  * A container for the memory used by evolveParams. Is to be created once
  * via prepareEvolverMemory and passed to calls to evolveParams,
@@ -108,7 +110,9 @@ evolveOutcome evolveParamsByImaginaryTime(
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	int (*inversionMethod)(EvolverMemory*),
 	MultiQubit qubits, double* params, Hamiltonian hamil,
-	double timeStepSize, int wrapParams, int derivAccuracy, double matrNoise);
+	double timeStepSize, int wrapParams, int derivAccuracy, 
+    int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor
+);
 	
 /**
  * Behaves similarly to evolveParams, but using gradient descent (disregards A matrix)
@@ -118,7 +122,16 @@ evolveOutcome evolveParamsByImaginaryTime(
 evolveOutcome evolveParamsByGradientDescent(
 	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	MultiQubit qubits, double* params, Hamiltonian hamil, 
-	double timeStepSize, int wrapParams, int derivAccuracy, double matrNoise);
+	double timeStepSize, int wrapParams, int derivAccuracy,
+    int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor
+);
+    
+    
+/* adds noise */
+typedef void (*NoiseModel)(EvolverMemory*, double);    
+void addDumbNoiseToDerivMatrices(EvolverMemory *mem, double fractionalVar);
+void addShotNoiseToDerivMatrices(EvolverMemory *mem, double numSamples);
+    
 	
 /**
  * returns whether the current simulation has halted, based on the evolution of the parameters

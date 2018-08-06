@@ -176,7 +176,9 @@ int main(int narg, char *varg[]) {
 	int maxIterations;
 	int wrapParams;
 	int derivAccuracy;
-	double matrNoise;
+    int shotNoiseNumSamplesA;
+    int shotNoiseNumSamplesC;
+    double decoherenceFactor;
 	int useGradDesc;
 	char* ansatzCircString;
 	double paramChangeThreshold;
@@ -238,12 +240,22 @@ int main(int narg, char *varg[]) {
 		printf("deriv_accuracy: ");
 		scanf("%d", &derivAccuracy);
 		printf("\n");
-		
-		printf("Enter the fraction of random noise in the A and C matrices each iteration\n"
-			   "(0 for no noise, e.g. 0.3 for maximum +- 30%% random fluctuation in each element)\n");
-		printf("matrix_noise: ");
-		scanf("%lf", &matrNoise);
-		printf("\n");
+        
+        printf("Enter the number of measurements performed when finding Aij (for shot noise).\n(0 for noise-free)\n");
+        printf("shot_noise_num_sampels_A: ");
+        scanf("%d", &shotNoiseNumSamplesA);
+        printf("\n");
+        
+        printf("Enter the number of measurements performed when finding each Hamiltonian term in each Ci (for shot noise).\n(0 for noise-free)\n");
+        printf("shot_noise_num_sampels_C: ");
+        scanf("%d", &shotNoiseNumSamplesC);
+        printf("\n");
+        
+        printf("Enter the factor that decoherence applies to the expected measurement outcomes.\n"
+               "1 for no noise, 0 for complete decoherence)\n");
+        printf("decoherence_factor: ");
+        scanf("%lf", &decoherenceFactor);
+        printf("\n");
 		
 		printf("Enter whether to use imaginary-time evolution (0) or gradient descent (1)\n");
 		printf("use_gd: ");
@@ -287,7 +299,7 @@ int main(int narg, char *varg[]) {
 		
 		
 	// invalid number of args input
-	} else if (narg != 18) {
+	} else if (narg != 20) {
 		printf("\nERROR! Call with arguments:\n");
 		printf(
 			"num_bools\n"
@@ -299,7 +311,9 @@ int main(int narg, char *varg[]) {
 			"max_iters\n"
 			"wrap_params\n"
 			"deriv_accuracy[1 to 4]\n"
-			"matrix_noise[0 to 1]\n"
+            "shot_noise_num_samples_A\n"
+            "shot_noise_num_samples_C\n"
+            "decoherence_factor\n"
 			"use_gd[0 or 1]\n"
 			"ansatz\n"
 			"param_change\n"
@@ -315,23 +329,26 @@ int main(int narg, char *varg[]) {
 	// cmd arg input
 	} else {
 	
-		numQubits = atoi(varg[1]);
-		hamilTypeString = varg[2];
-		hamilFilename = varg[3];
-		numParams = atoi(varg[4]);
-		randSeed = atoi(varg[5]); 
-		sscanf(varg[6], "%lf", &timeStep);
-		maxIterations = atoi(varg[7]);
-		wrapParams = atoi(varg[8]);
-		derivAccuracy = atoi(varg[9]);
-		sscanf(varg[10], "%lf", &matrNoise);
-		useGradDesc = atoi(varg[11]);
-		ansatzCircString = varg[12];
-		sscanf(varg[13], "%lf", &paramChangeThreshold);
-		exciteWhenStuck = atoi(varg[14]);
-		simRepetitions = atoi(varg[15]);
-		progressPrintFrequency = atoi(varg[16]);
-		outputFilename = varg[17];
+        int ind = 1;
+		numQubits = atoi(varg[ind++]);
+		hamilTypeString = varg[ind++];
+		hamilFilename = varg[ind++];
+		numParams = atoi(varg[ind++]);
+		randSeed = atoi(varg[ind++]); 
+		sscanf(varg[ind++], "%lf", &timeStep);
+		maxIterations = atoi(varg[ind++]);
+		wrapParams = atoi(varg[ind++]);
+		derivAccuracy = atoi(varg[ind++]);
+        shotNoiseNumSamplesA = atoi(varg[ind++]);
+        shotNoiseNumSamplesC = atoi(varg[ind++]);
+        sscanf(varg[ind++], "%lf", &decoherenceFactor);
+		useGradDesc = atoi(varg[ind++]);
+		ansatzCircString = varg[ind++];
+		sscanf(varg[ind++], "%lf", &paramChangeThreshold);
+		exciteWhenStuck = atoi(varg[ind++]);
+		simRepetitions = atoi(varg[ind++]);
+		progressPrintFrequency = atoi(varg[ind++]);
+		outputFilename = varg[ind++];
 	}
 	
 	// seed before 3SAT Hamil generation
@@ -399,7 +416,9 @@ int main(int narg, char *varg[]) {
 	printf("iterations: %d\n", maxIterations);
 	printf("wrapParams: %d\n", wrapParams);
 	printf("derivAccuracy: %d\n", derivAccuracy);
-	printf("matrNoise: %lf\n", matrNoise);
+    printf("shotNoiseNumSamplesA: %d\n", shotNoiseNumSamplesA);
+    printf("shotNoiseNumSamplesC: %d\n", shotNoiseNumSamplesC);
+    printf("decoherenceFactor: %lf\n", decoherenceFactor);
 	printf("useGradDesc: %d\n", useGradDesc);
 	printf("ansatzCircuit: %s\n", ansatzCircString);
 	printf("paramChangeThreshold: %lf\n", paramChangeThreshold);
@@ -691,14 +710,16 @@ int main(int narg, char *varg[]) {
 			// update params under parameterised evolution
 			if (useGradDesc)
 				outcome = evolveParamsByGradientDescent(
-					&mem, ansatz, qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
+					&mem, ansatz, qubits, params, hamil, timeStep, wrapParams, derivAccuracy, 
+                    shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
 			else
 				outcome = evolveParamsByImaginaryTime(
 					&mem, ansatz, 
 					//approxParamsByTSVD,
 					approxParamsByTikhonov,
 					//approxParamsByLUDecomp,
-					qubits, params, hamil, timeStep, wrapParams, derivAccuracy, matrNoise);
+					qubits, params, hamil, timeStep, wrapParams, derivAccuracy, 
+                    shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
 			
 			if (outcome == FAILED) {
 				printf("Numerical inversion failed! Aborting entire sim!\n");
@@ -807,7 +828,9 @@ int main(int narg, char *varg[]) {
 		writeIntToAssoc(file, "simRepetitions", simRepetitions);
 		writeIntToAssoc(file, "maxIterations", maxIterations);
 		writeIntToAssoc(file, "derivAccuracy", derivAccuracy);
-		writeDoubleToAssoc(file, "matrNoise", matrNoise, 5);
+        writeIntToAssoc(file, "shotNoiseNumSamplesA", shotNoiseNumSamplesA);
+        writeIntToAssoc(file, "shotNoiseNumSamplesC", shotNoiseNumSamplesC);
+        writeDoubleToAssoc(file, "decoherenceFactor", decoherenceFactor, 10);
 		writeIntToAssoc(file, "wrapParams", wrapParams);
 		writeDoubleToAssoc(file, "timeStep", timeStep, 10);
 		writeIntToAssoc(file, "useGradDesc", useGradDesc);

@@ -22,6 +22,7 @@ typedef struct {
 	// Chemistry pauli-terms Hamiltonian
 	int numTerms;
 	double* termCoeffs;
+    double termCoeffSquaredSum; // sum_i (termCoeff_i)^2
 	int** terms;
 	
 } Hamiltonian;

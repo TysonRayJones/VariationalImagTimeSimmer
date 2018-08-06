@@ -162,32 +162,57 @@ void exciteSavedStatesInDerivMatrices(EvolverMemory *mem, MultiQubit qubits) {
 }
 
 
-/**
- * adds noise to A and C matrices in mem. 
- * Each element experiences a chance in value of [-1,1]*fractionalVar * value
+
+
+
+double sampleNormalDistrib(double mean, double var) {
+    
+    // sample the the standard normal distribution via Box-Muller
+    double unif1 = rand() / (double) RAND_MAX;
+    double unif2 = rand() / (double) RAND_MAX;
+    double norm1 = sqrt(-2.0 * log(unif1)) * cos(2*M_PI*unif2);
+    
+    // sample a normal dist with new expected value and variance
+	return mean + norm1*var;
+}
+
+/** Effects decoherence in the circuits and shot noise in the deriv sampling by changing the matrix
+ * elements to be random samples of normal distributions. Overestimates controlled-gate shot-noise to be
+ * the same as single-qubit-gate variance. Overestimates the shot noise in the C vector by assuming
+ * every hamil term has inner product zero (in order to maximise the measurement variance). Effects
+ * decoherence by shrinking every expected measurement value closer to 0 (the mixed state).
  */
-void addNoiseToDerivMatrices(EvolverMemory *mem, double fractionalVar) {
-	
-	double oldval, newval, randd;
+void addNoiseToDerivMatrices(
+    EvolverMemory *mem, double chemHamilCoeffSquaredSum, 
+    int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherFac
+) {    
+	double oldval, mesvar, newval;
 			
 	for (int i=0; i < mem->numParams; i++) {
 		
+        // update C
 		oldval = gsl_vector_get(mem->vecC, i);
-		randd = rand() / (double) RAND_MAX;
-		newval = oldval + fractionalVar * fabs(oldval) * (2*randd - 1);
+        if (shotNoiseNumSamplesC == 0)
+            mesvar = 0;
+        else
+            mesvar = chemHamilCoeffSquaredSum/4.0/shotNoiseNumSamplesC;
+		newval = sampleNormalDistrib(decoherFac * oldval, mesvar);
 		gsl_vector_set(mem->vecC, i, newval);
+        
 		
 		for (int j=0; j < mem->numParams; j++) {
-			
-			oldval = gsl_matrix_get(mem->matrA, i, j);
-			randd = rand() / (double) RAND_MAX;
-			newval = oldval + fractionalVar * fabs(oldval) * (2*randd - 1);
+            
+            // current element
+            oldval = gsl_matrix_get(mem->matrA, i, j);
+            if (shotNoiseNumSamplesA == 0)
+                mesvar = 0;
+            else
+                mesvar = (1/16.0 - decoherFac*decoherFac * oldval*oldval)/(double)shotNoiseNumSamplesA;
+            newval = sampleNormalDistrib(decoherFac * oldval, mesvar);
 			gsl_matrix_set(mem->matrA, i, j, newval);
 		}
 	}
 }
-
-
 
 
 /**
@@ -217,16 +242,19 @@ void addNoiseToDerivMatrices(EvolverMemory *mem, double fractionalVar) {
   * @param timeStepSize			size of the step-size in imag-time
   * @param wrapParams				1 to keep params in [0, 2pi) by wrap-around, 0 to let them grow
   * @param derivAccuracy			accuracy of finite-difference approx to param derivs in {1, 2, 3, 4}
-  * @param matrNoise				noise (in [0, 1]) to add to A and C matrices before solving. each elem += +- noise*val
+  * @param shotNoiseNumSamplesA     Number of measurements per A element, used to add shot noise
+  * @param shotNoiseNumSamplesC     Number of measurements per Hamiltonian term per C element, used for shot noise
+  * @param decoherenceFactor        Multiplies with expected values of measurements to effect decoherence
   * @return SUCCESS 				indicates numerical updating (by inversionMethod) of the params worked 
   * @return FAILED					indicates inversionMethod failed
   */
 evolveOutcome evolveParamsByImaginaryTime(
 	EvolverMemory *mem, 
-	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
+	void (*ansatzCircuit)(EvolverMemory*, MultiQubit, double*, int), 
 	int (*inversionMethod)(EvolverMemory*),
 	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, 
-	int wrapParams, int derivAccuracy, double matrNoise) 
+	int wrapParams, int derivAccuracy, 
+    int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor) 
 {
 	evolveOutcome outcome = SUCCESS;
 	
@@ -237,8 +265,8 @@ evolveOutcome evolveParamsByImaginaryTime(
 	exciteSavedStatesInDerivMatrices(mem, qubits);
 	
 	// add a little noise to A and C
-	addNoiseToDerivMatrices(mem, matrNoise);
-	
+	addNoiseToDerivMatrices(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
+    
 	// solve A paramChange = C
 	int singular = inversionMethod(mem);
 	if (singular)
@@ -270,7 +298,8 @@ evolveOutcome evolveParamsByGradientDescent(
 	EvolverMemory *mem, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
 	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, int wrapParams,
-	int derivAccuracy, double matrNoise) 
+	int derivAccuracy, 
+    int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor)
 {
 	// compute matrices A and C
 	computeDerivMatrices(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
@@ -279,8 +308,8 @@ evolveOutcome evolveParamsByGradientDescent(
 	exciteSavedStatesInDerivMatrices(mem, qubits);
 	
 	// add a little noise to A and C
-	addNoiseToDerivMatrices(mem, matrNoise);
-	
+	addNoiseToDerivMatrices(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
+    
 	// update params
 	for (int i=0; i < mem->numParams; i++)
 		params[i] += timeStepSize*gsl_vector_get(mem->vecC, i);
