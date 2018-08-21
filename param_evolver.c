@@ -31,7 +31,7 @@ const double EXCITATION_OF_SAVED_STATES = 10;
 
 
 /** finite-dif first deriv coefficients of psi(x+nh) for n > 0, or -1*(that for n < 0) */
-double FINITE_DIFFERENCE_COEFFS[4][4] = {
+double FIRST_DERIV_FINITE_DIFFERENCE_COEFFS[4][4] = {
 	{1/2.0},
 	{2/3.0, -1/12.0},
 	{3/4.0, -3/20.0, 1/60.0},
@@ -40,15 +40,24 @@ double FINITE_DIFFERENCE_COEFFS[4][4] = {
 // https://en.wikipedia.org/wiki/Finite_difference_coefficient
 
 
+/* psi(x+nh) for n >= 0 (same for n < 0) */
+double SECOND_DERIV_FINITE_DIFFERENCE_COEFFS[4][5] = {
+    {-2.0, 1.0},
+    {-5/2.0, 4/3.0, -1/12.0},
+    {-49/18.0, 3/2.0, -3/20.0, 1/90.0},
+    {-205/72.0, 8/5.0, -1/5.0, 8/315.0, -1/560.0}
+};
+// https://en.wikipedia.org/wiki/Finite_difference_coefficient
 
-/**
+
+/** dpsi/dp
  * Gives the derivative (as a 2^N length array of complex doubles) of the
  * wavefunction produced by ansatzircuit w.r.t a given parameter in the 
  * region of the passed parameters, approximated using the accuracy-order 
  * central finite-difference formula. Deriv must be pre allocated, and is
  * modified
  */
-void findDeriv(
+void findFirstDeriv(
 	EvolverMemory *mem, 
 	double complex *deriv, long long int length, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
@@ -59,7 +68,7 @@ void findDeriv(
 		deriv[i] = 0;
 	
 	// approx deriv with finite difference
-	double* coeffs = FINITE_DIFFERENCE_COEFFS[accuracy - 1];
+	double* coeffs = FIRST_DERIV_FINITE_DIFFERENCE_COEFFS[accuracy - 1];
 	double origParam = params[paramInd];
 	
 	// repeatly add c*psi(p+ndp) - c*psi(p-ndp) to deriv
@@ -80,6 +89,104 @@ void findDeriv(
 	params[paramInd] = origParam;
 }
 
+/** d^2 psi/dp^2
+ * Gives the 2nd derivative (as a 2^N length array of complex doubles) of the
+ * wavefunction produced by ansatzircuit w.r.t a given parameter in the 
+ * region of the passed parameters, approximated using the accuracy-order 
+ * central finite-difference formula. Deriv must be pre allocated, and is
+ * modified
+ */
+void findSecondDeriv(
+	EvolverMemory *mem, 
+	double complex *secondDeriv, long long int length, 
+	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
+	MultiQubit qubits, double* params, int numParams, int paramInd, int accuracy
+) {
+
+	// clear deriv
+	for (long long int i=0LL; i < length; i++)
+		secondDeriv[i] = 0;
+
+	// approx deriv with finite difference
+	double* coeffs = SECOND_DERIV_FINITE_DIFFERENCE_COEFFS[accuracy - 1];
+	double origParam = params[paramInd];
+    
+    for (int step=0; step <= accuracy; step++) {
+		
+        params[paramInd] = origParam + step*DERIV_STEP_SIZE;
+        ansatzCircuit(mem, qubits, params, numParams);
+		for (long long int i=0LL; i < length; i++)
+			secondDeriv[i] += coeffs[step] * (getRealAmpEl(qubits, i) + I*getImagAmpEl(qubits, i));
+        
+        if (step == 0)
+            continue;
+        
+        params[paramInd] = origParam - step*DERIV_STEP_SIZE;
+        ansatzCircuit(mem, qubits, params, numParams);
+		for (long long int i=0LL; i < length; i++)
+			secondDeriv[i] += coeffs[step] * (getRealAmpEl(qubits, i) + I*getImagAmpEl(qubits, i));
+        
+    }
+    
+	// divide by the step size squared
+	for (long long int i=0LL; i < length; i++) 
+		secondDeriv[i] /= (DERIV_STEP_SIZE * DERIV_STEP_SIZE);
+	
+	// reset the original param value
+	params[paramInd] = origParam;
+}
+
+/** d^2 psi/dp1 dp2
+ */
+void findMixedFirstDerivs(
+	EvolverMemory *mem, 
+	double complex *mixedDeriv, long long int length, 
+	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
+	MultiQubit qubits, double* params, int numParams, 
+    int paramInd1, int paramInd2, int accuracy)
+{
+	// clear deriv
+	for (long long int i=0LL; i < length; i++)
+		mixedDeriv[i] = 0;
+	
+	// approx deriv with finite difference
+	double* coeffs = FIRST_DERIV_FINITE_DIFFERENCE_COEFFS[accuracy - 1];
+	double origParam1 = params[paramInd1];
+    double origParam2 = params[paramInd2];
+	
+	// repeatly add c*psi(p+ndp) - c*psi(p-ndp) to deriv
+	for (int step1=1; step1 <= accuracy; step1++) {
+		for (int sign1 = -1; sign1 <= 1; sign1+=2) {
+			params[paramInd1] = origParam1 + sign1*step1*DERIV_STEP_SIZE;
+            
+        	for (int step2=1; step2 <= accuracy; step2++) {
+        		for (int sign2 = -1; sign2 <= 1; sign2+=2) {
+        			params[paramInd2] = origParam2 + sign2*step2*DERIV_STEP_SIZE;
+            
+			        ansatzCircuit(mem, qubits, params, numParams);
+			        for (long long int i=0LL; i < length; i++)
+				        mixedDeriv[i] += sign1*coeffs[step1-1] * sign2*coeffs[step2-1] * (getRealAmpEl(qubits, i) + I*getImagAmpEl(qubits, i));
+                }
+            }
+		}
+	}
+	
+	// divide by the step size
+	for (long long int i=0LL; i < length; i++) 
+		mixedDeriv[i] /= (DERIV_STEP_SIZE * DERIV_STEP_SIZE);
+	
+	// reset the original param values
+	params[paramInd1] = origParam1; 
+	params[paramInd2] = origParam2;  
+}
+
+
+
+
+
+
+
+
 
 /**
  * Returns the real component of the inner product between two complex vectors 
@@ -93,7 +200,6 @@ double realInnerProduct(double complex* vec1, double complex* vec2, long long in
 		
 	return prod;
 }
-
 
 double complex innerProduct(double complex* vec1, double complex* vec2, long long int length) {
 	
@@ -121,30 +227,51 @@ double complex innerProductOnQubits(double complex* vec1, MultiQubit qubits, lon
  * mem.vecC: C_i = -2*Re{ d <psi(p)| dp_i . H . |psi(p)> }
  * The derivs and hamilState data structures in mem are also modified
  */
-void computeDerivMatrices(
+void computeFirstDerivs(
 	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
 	MultiQubit qubits, double* params, Hamiltonian hamil, int accuracy) 
 {	
 	// collect wavef derivs w.r.t each parameter
 	for (int i=0; i < mem->numParams; i++)
-		findDeriv(mem, mem->derivs[i], mem->stateSize, ansatzCircuit, qubits, params, mem->numParams, i, accuracy);
-	
-	// populate matrix A with inner product of derivs
+		findFirstDeriv(mem, mem->firstDerivs[i], mem->stateSize, ansatzCircuit, qubits, params, mem->numParams, i, accuracy);
+}
+
+
+
+
+/** to be called after computeFirstDerivs */
+void computeVectorA(EvolverMemory *mem) 
+{	
 	for (int i=0; i < mem->numParams; i++)
 		for (int j=0; j < mem->numParams; j++)
-			gsl_matrix_set(mem->matrA, i, j, realInnerProduct(mem->derivs[i], mem->derivs[j], mem->stateSize));
-	
-	// populate vector C with inner product of derivs and H on psi
+			gsl_matrix_set(mem->matrA, i, j, realInnerProduct(mem->firstDerivs[i], mem->firstDerivs[j], mem->stateSize));
+}
+
+/** to be called after computeFirstDerivs */
+void computeVectorC(
+	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
+	MultiQubit qubits, double* params, Hamiltonian hamil) 
+{	
 	ansatzCircuit(mem, qubits, params, mem->numParams);
 	applyHamil(mem->hamilState, qubits, hamil);
 	for (int i=0; i < mem->numParams; i++)
-		gsl_vector_set(mem->vecC, i, -realInnerProduct(mem->derivs[i], mem->hamilState, mem->stateSize));
+		gsl_vector_set(mem->vecC, i, -realInnerProduct(mem->firstDerivs[i], mem->hamilState, mem->stateSize));
 }
+
+void computeHessian() {
+    
+}
+
+void computeAdamMoments() {
+    
+}
+
+
 
 
 /**
  * Updates the deriv matrices to reflect excitations in the Hamiltonian for each of the
- * saved states (those recorded by exciteStateInHamiltonian)
+ * saved states (those recorded by exciteStateInHamiltonian), by modifying the C vector
  */
 void exciteSavedStatesInDerivMatrices(EvolverMemory *mem, MultiQubit qubits) {
 	
@@ -152,7 +279,7 @@ void exciteSavedStatesInDerivMatrices(EvolverMemory *mem, MultiQubit qubits) {
 		double complex saveProjOnQubits = innerProductOnQubits(mem->savedStates[s], qubits, qubits.numAmps);
 	
 		for (int i=0; i < mem->numParams; i++) {
-			double complex saveProjOnDeriv = innerProduct(mem->derivs[i], mem->savedStates[s], qubits.numAmps);
+			double complex saveProjOnDeriv = innerProduct(mem->firstDerivs[i], mem->savedStates[s], qubits.numAmps);
 			
 			double currC = gsl_vector_get(mem->vecC, i);
 			double newC = currC - creal(saveProjOnDeriv * saveProjOnQubits) * EXCITATION_OF_SAVED_STATES;
@@ -259,7 +386,9 @@ evolveOutcome evolveParamsByImaginaryTime(
 	evolveOutcome outcome = SUCCESS;
 	
 	// compute matrices A and C
-	computeDerivMatrices(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+    computeVectorA(mem);
+    computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
 	
 	// morph C to excite Hamiltonain states
 	exciteSavedStatesInDerivMatrices(mem, qubits);
@@ -301,8 +430,9 @@ evolveOutcome evolveParamsByGradientDescent(
 	int derivAccuracy, 
     int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor)
 {
-	// compute matrices A and C
-	computeDerivMatrices(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+	// compute matrix A
+	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+    computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
 	
 	// morph C to excite Hamiltonain states
 	exciteSavedStatesInDerivMatrices(mem, qubits);
@@ -413,9 +543,16 @@ EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 	initStateZero(&qubits);
 	setAnsatzInitState(&memory, qubits);
 	memory.hamilState = malloc(memory.stateSize * sizeof *memory.hamilState);
-	memory.derivs = malloc(memory.numParams * sizeof *memory.derivs);
-	for (int i=0; i < memory.numParams; i++)
-		memory.derivs[i] = malloc(memory.stateSize * sizeof **memory.derivs);
+	memory.firstDerivs = malloc(memory.numParams * sizeof *memory.firstDerivs);
+	memory.secondDerivs = malloc(memory.numParams * sizeof *memory.secondDerivs);
+    memory.mixedDerivs = malloc(numParams*(numParams-1) * sizeof *memory.mixedDerivs);
+	for (int i=0; i < memory.numParams; i++) {
+		memory.firstDerivs[i] = malloc(memory.stateSize * sizeof **memory.firstDerivs);
+		memory.secondDerivs[i] = malloc(memory.stateSize * sizeof **memory.secondDerivs);
+    }
+    for (int i=0; i < numParams*(numParams-1); i++) {
+        memory.mixedDerivs[i] = malloc(memory.stateSize * sizeof **memory.mixedDerivs);
+    }
 		
 	// allocate saved state objects
 	memory.numSavedStates = 0;
@@ -491,11 +628,18 @@ void clearExcitedStates(EvolverMemory *memory) {
 void freeEvolverMemory(EvolverMemory *memory) {
 	
 	// free state info
-	for (int i=0; i < memory->numParams; i++)
-		free(memory->derivs[i]);
+	for (int i=0; i < memory->numParams; i++) {
+		free(memory->firstDerivs[i]);
+        free(memory->secondDerivs[i]);
+    }
+    for (int i=0; i < (memory->numParams)*(memory->numParams - 1); i++) {
+        free(memory->mixedDerivs[i]);
+    }
 	
 	// free arrays
-	free(memory->derivs);
+	free(memory->firstDerivs);
+    free(memory->secondDerivs);
+    free(memory->mixedDerivs);
 	free(memory->hamilState);
 	free(memory->initState);
 	

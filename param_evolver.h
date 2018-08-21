@@ -34,7 +34,9 @@ typedef struct {
 	// state and hamiltonian info
 	long long int stateSize;
 	int numParams;
-	double complex **derivs;
+	double complex **firstDerivs;
+    double complex **secondDerivs;
+    double complex **mixedDerivs;
 	double complex *hamilState;
 	double complex *initState;
 	
