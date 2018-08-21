@@ -45,9 +45,11 @@ typedef struct {
 	double complex **savedStates;
 	
 	// gsl objects for invertible A
-	gsl_matrix *matrA;
+    gsl_vector *paramChange;
+    gsl_vector *vecC;           // gradient 
+	gsl_matrix *matrA;          // imaginary-time
 	gsl_permutation *permA;
-	gsl_vector *vecC, *paramChange;
+	gsl_matrix *matrHessian;    // Hessian grad-desc
 	
 	// gsl objects for least squares, when A not invertible
 	gsl_matrix *matrATA;
@@ -110,7 +112,7 @@ typedef enum evolveOutcome {SUCCESS, FAILED} evolveOutcome;
 evolveOutcome evolveParamsByImaginaryTime(
 	EvolverMemory *mem, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int), 
-	int (*inversionMethod)(EvolverMemory*),
+	int (*inversionMethod)(EvolverMemory*, gsl_matrix*),
 	MultiQubit qubits, double* params, Hamiltonian hamil,
 	double timeStepSize, int wrapParams, int derivAccuracy, 
     int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor
@@ -126,6 +128,15 @@ evolveOutcome evolveParamsByGradientDescent(
 	MultiQubit qubits, double* params, Hamiltonian hamil, 
 	double timeStepSize, int wrapParams, int derivAccuracy,
     int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor
+);
+    
+evolveOutcome evolveParamsByHessian(
+	EvolverMemory *mem, 
+	void (*ansatzCircuit)(EvolverMemory*, MultiQubit, double*, int), 
+	int (*inversionMethod)(EvolverMemory*, gsl_matrix*),
+	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, 
+	int wrapParams, int derivAccuracy, 
+    int shotNoiseNumSamplesHess, int shotNoiseNumSamplesC, double decoherenceFactor
 );
     
     

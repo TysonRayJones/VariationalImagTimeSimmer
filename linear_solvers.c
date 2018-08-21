@@ -37,13 +37,13 @@ const double TIKHONOV_REG_MAX_PARAM = 0.001;
  * Attempts to perform direct solving by LU decomposition, which is
  * unstable and liable to fail.
  */
-int approxParamsByLUDecomp(EvolverMemory *mem) {
+int approxParamsByLUDecomp(EvolverMemory *mem, gsl_matrix* matr) {
 	
 	// Simon says: APPAERNTLY THIS OFTEN PICKS ANY SOLUTION: LU comp is stored in Perm
 	// Simon gets different answers for resolving
 	int swaps, singular;
-	gsl_linalg_LU_decomp(mem->matrA, mem->permA, &swaps);
-	singular = gsl_linalg_LU_solve(mem->matrA, mem->permA, mem->vecC, mem->paramChange);
+	gsl_linalg_LU_decomp(matr, mem->permA, &swaps); // using permaA for e.g. hessian matrix is fine
+	singular = gsl_linalg_LU_solve(matr, mem->permA, mem->vecC, mem->paramChange);
 	if (singular)
 		printf("Direct LU decomposition failed! Aborting...\n");
 		
@@ -54,11 +54,11 @@ int approxParamsByLUDecomp(EvolverMemory *mem) {
 /**
  * Householder (orthogonal equations) solve the least-squares approximation
  */
-int approxParamsByLeastSquares(EvolverMemory *mem) {
+int approxParamsByLeastSquares(EvolverMemory *mem, gsl_matrix* matr) {
 
-	// compute A^T A and A^T C
-	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, mem->matrA, mem->matrA, 0.0, mem->matrATA);
-	gsl_blas_dgemv(CblasTrans, 1.0, mem->matrA, mem->vecC, 0.0, mem->vecATC);
+	// compute A^T A and A^T C (here A can actually be hessian matrix - that's fine)
+	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, matr, matr, 0.0, mem->matrATA);
+	gsl_blas_dgemv(CblasTrans, 1.0, matr, mem->vecC, 0.0, mem->vecATC);
 	
 	// solve A^T A paramChange = A^T C, returning success flag
 	return gsl_linalg_HH_solve(mem->matrATA, mem->vecATC, mem->paramChange);
@@ -69,12 +69,14 @@ int approxParamsByLeastSquares(EvolverMemory *mem) {
  * LU solve the same constraints with the final var set to 0
  * (Sam and Xiao's current method)
  */
-int approxParamsByRemovingVar(EvolverMemory *mem) {
+int approxParamsByRemovingVar(EvolverMemory *mem, gsl_matrix* matr) {
+    
+    // here, A can actually be hessian matrix - that's fine
 		
 	// Asub = shave off final col of A
 	for (int i=0; i < mem->numParams; i++)
 		for (int j=0; j < mem->numParams-1; j++)
-			gsl_matrix_set(mem->matrASub, i, j, gsl_matrix_get(mem->matrA, i, j));
+			gsl_matrix_set(mem->matrASub, i, j, gsl_matrix_get(matr, i, j));
 	
 	// Csub = remove final elem of C
 	for (int i=0; i < mem->numParams-1; i++)
@@ -98,12 +100,12 @@ int approxParamsByRemovingVar(EvolverMemory *mem) {
 /**
  * Solve for paramChange by truncated SVD
  */
-int approxParamsByTSVD(EvolverMemory *mem) { 
+int approxParamsByTSVD(EvolverMemory *mem, gsl_matrix* matr) { 
 	
 	double residSum;
 	size_t singValsKept;
 	return gsl_multifit_linear_tsvd(
-		mem->matrA, mem->vecC, mem->svdTolerance, mem->paramChange, 
+		matr, mem->vecC, mem->svdTolerance, mem->paramChange, 
 		mem->svdCovar, &residSum, &singValsKept, mem->svdSpace);
 }
 
@@ -120,14 +122,14 @@ int approxParamsByTSVD(EvolverMemory *mem) {
  * http://www2.compute.dtu.dk/~pcha/DIP/chap5.pdf
  * http://people.bath.ac.uk/mamamf/talks/ilas.pdf
  */
-int approxParamsByTikhonov(EvolverMemory *mem) {
+int approxParamsByTikhonov(EvolverMemory *mem, gsl_matrix* matr) {
 	
 	// whether we fail to sample tikhonovParams, fail to optimise it,
 	// or fail to Tikhonov solve
 	int failure;
 	
 	// compute the SVD in the workspace (needed for L-curve and solve)
-	failure = gsl_multifit_linear_svd(mem->matrA, mem->svdSpace);
+	failure = gsl_multifit_linear_svd(matr, mem->svdSpace);
 	if (failure) {
 		printf("Computing SVD of matrA failed in Titkhonov! Aborting...\n");
 		return failure;
@@ -167,7 +169,7 @@ int approxParamsByTikhonov(EvolverMemory *mem) {
 	
 	// perform Tikhonov regularisation (where L = identity)
 	failure = gsl_multifit_linear_solve(
-		tikhonovParam, mem->matrA, mem->vecC, mem->paramChange,
+		tikhonovParam, matr, mem->vecC, mem->paramChange,
 		&residualNorm, &paramChangeNorm, mem->svdSpace
 	);
 	if (failure) {

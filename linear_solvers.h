@@ -28,12 +28,13 @@ extern const double TIKHONOV_REG_MAX_PARAM;
 
 /**
  * provided methods for numerically solving for the change in params (pass to evolveParams)
+ * by solving matr dp = vectorC
  * Individiaul descriptions are in param_evolver.c
  */
-int approxParamsByLUDecomp(EvolverMemory *mem);
-int approxParamsByLeastSquares(EvolverMemory *mem);
-int approxParamsByRemovingVar(EvolverMemory *mem);
-int approxParamsByTSVD(EvolverMemory *mem);
-int approxParamsByTikhonov(EvolverMemory *mem);
+int approxParamsByLUDecomp(EvolverMemory *mem, gsl_matrix* matr);
+int approxParamsByLeastSquares(EvolverMemory *mem, gsl_matrix* matr);
+int approxParamsByRemovingVar(EvolverMemory *mem, gsl_matrix* matr);
+int approxParamsByTSVD(EvolverMemory *mem, gsl_matrix* matr);
+int approxParamsByTikhonov(EvolverMemory *mem, gsl_matrix* matr);
 
 #endif // LINEAR_SOLVERS_H_

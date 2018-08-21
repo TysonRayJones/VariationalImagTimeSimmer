@@ -138,7 +138,7 @@ void findSecondDeriv(
 
 /** d^2 psi/dp1 dp2
  */
-void findMixedFirstDerivs(
+void findMixedDeriv(
 	EvolverMemory *mem, 
 	double complex *mixedDeriv, long long int length, 
 	void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
@@ -234,10 +234,26 @@ void computeFirstDerivs(
 	// collect wavef derivs w.r.t each parameter
 	for (int i=0; i < mem->numParams; i++)
 		findFirstDeriv(mem, mem->firstDerivs[i], mem->stateSize, ansatzCircuit, qubits, params, mem->numParams, i, accuracy);
+    
+    // also compute hamilState (used by vecC and matrHessian)
+	ansatzCircuit(mem, qubits, params, mem->numParams);
+	applyHamil(mem->hamilState, qubits, hamil);
 }
 
-
-
+void computeSecondDerivs(
+	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
+	MultiQubit qubits, double* params, Hamiltonian hamil, int accuracy)
+{
+	// collect wavef 2nd derivs w.r.t each parameter (d^2 psi / dp^2)
+	for (int i=0; i < mem->numParams; i++)
+		findSecondDeriv(mem, mem->secondDerivs[i], mem->stateSize, ansatzCircuit, qubits, params, mem->numParams, i, accuracy);
+    
+    // collect mixed derivs (d^2 psi /dp1 dp2)
+    int ind=0;
+    for (int i=0; i < mem->numParams; i++)
+        for (int j=i+1; j < i; j++)
+            findMixedDeriv(mem, mem->mixedDerivs[ind++], mem->stateSize, ansatzCircuit, qubits, params, mem->numParams, i, j, accuracy);
+}
 
 /** to be called after computeFirstDerivs */
 void computeVectorA(EvolverMemory *mem) 
@@ -252,14 +268,30 @@ void computeVectorC(
 	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
 	MultiQubit qubits, double* params, Hamiltonian hamil) 
 {	
-	ansatzCircuit(mem, qubits, params, mem->numParams);
-	applyHamil(mem->hamilState, qubits, hamil);
 	for (int i=0; i < mem->numParams; i++)
 		gsl_vector_set(mem->vecC, i, -realInnerProduct(mem->firstDerivs[i], mem->hamilState, mem->stateSize));
 }
 
-void computeHessian() {
+void computeHessian(EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
+	MultiQubit qubits, double* params, Hamiltonian hamil, int accuracy) {
     
+    // populated mem.secondDerivs and mem.mixedDerivs
+    computeSecondDerivs(mem, ansatzCircuit, qubits, params, hamil, accuracy);
+    
+    // set diagonals to second derivs
+    for (int i=0; i < mem->numParams; i++)
+        gsl_matrix_set(mem->matrHessian, i, i, 
+            realInnerProduct(mem->secondDerivs[i], mem->hamilState, mem->stateSize));
+    
+    // set off-diagonals to mixed derivs
+    int ind=0;
+    for (int i=0; i < mem->numParams; i++) {
+        for (int j=i+1; j < i; j++) {
+            REAL innerp = realInnerProduct(mem->mixedDerivs[ind++], mem->hamilState, mem->stateSize);
+            gsl_matrix_set(mem->matrHessian, i, j, innerp); 
+            gsl_matrix_set(mem->matrHessian, j, i, innerp);
+        }
+    }
 }
 
 void computeAdamMoments() {
@@ -309,10 +341,10 @@ double sampleNormalDistrib(double mean, double var) {
  * every hamil term has inner product zero (in order to maximise the measurement variance). Effects
  * decoherence by shrinking every expected measurement value closer to 0 (the mixed state).
  */
-void addNoiseToDerivMatrices(
+void addNoiseToVectorC(
     EvolverMemory *mem, double chemHamilCoeffSquaredSum, 
-    int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherFac
-) {    
+    int shotNoiseNumSamplesC, double decoherFac
+) {
 	double oldval, mesvar, newval;
 			
 	for (int i=0; i < mem->numParams; i++) {
@@ -326,7 +358,14 @@ void addNoiseToDerivMatrices(
 		newval = sampleNormalDistrib(decoherFac * oldval, mesvar);
 		gsl_vector_set(mem->vecC, i, newval);
         
-		
+    }
+}
+void addNoiseToMatrixA(
+    EvolverMemory *mem, double chemHamilCoeffSquaredSum, 
+    int shotNoiseNumSamplesA, double decoherFac
+) {    
+	double oldval, mesvar, newval;	
+	for (int i=0; i < mem->numParams; i++) {
 		for (int j=0; j < mem->numParams; j++) {
             
             // current element
@@ -340,7 +379,25 @@ void addNoiseToDerivMatrices(
 		}
 	}
 }
-
+void addNoiseToHessian(
+    EvolverMemory *mem, double chemHamilCoeffSquaredSum, 
+    int shotNoiseNumSamplesHess, double decoherFac
+) {    
+	double oldval, mesvar, newval;	
+	for (int i=0; i < mem->numParams; i++) {
+		for (int j=0; j < mem->numParams; j++) {
+            
+            // current element
+            oldval = gsl_matrix_get(mem->matrHessian, i, j);
+            if (shotNoiseNumSamplesHess == 0)
+                mesvar = 0;
+            else
+                mesvar = (1/16.0 - decoherFac*decoherFac * oldval*oldval)/(double)shotNoiseNumSamplesHess;
+            newval = sampleNormalDistrib(decoherFac * oldval, mesvar);
+			gsl_matrix_set(mem->matrHessian, i, j, newval);
+		}
+	}
+}
 
 /**
  * Given a list of parameters, a parameterised wavefunction (through ansatzCircuit) and
@@ -378,7 +435,7 @@ void addNoiseToDerivMatrices(
 evolveOutcome evolveParamsByImaginaryTime(
 	EvolverMemory *mem, 
 	void (*ansatzCircuit)(EvolverMemory*, MultiQubit, double*, int), 
-	int (*inversionMethod)(EvolverMemory*),
+	int (*inversionMethod)(EvolverMemory*, gsl_matrix*),
 	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, 
 	int wrapParams, int derivAccuracy, 
     int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor) 
@@ -394,10 +451,11 @@ evolveOutcome evolveParamsByImaginaryTime(
 	exciteSavedStatesInDerivMatrices(mem, qubits);
 	
 	// add a little noise to A and C
-	addNoiseToDerivMatrices(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
+    addNoiseToMatrixA(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesA, decoherenceFactor);
+    addNoiseToVectorC(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesC, decoherenceFactor);
     
 	// solve A paramChange = C
-	int singular = inversionMethod(mem);
+	int singular = inversionMethod(mem, mem->matrA);
 	if (singular)
 		return FAILED;
 
@@ -430,15 +488,15 @@ evolveOutcome evolveParamsByGradientDescent(
 	int derivAccuracy, 
     int shotNoiseNumSamplesA, int shotNoiseNumSamplesC, double decoherenceFactor)
 {
-	// compute matrix A
+	// compute vector C
 	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
     computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
 	
 	// morph C to excite Hamiltonain states
 	exciteSavedStatesInDerivMatrices(mem, qubits);
 	
-	// add a little noise to A and C
-	addNoiseToDerivMatrices(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
+	// add a little noise to C
+    addNoiseToVectorC(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesC, decoherenceFactor);
     
 	// update params
 	for (int i=0; i < mem->numParams; i++)
@@ -450,12 +508,54 @@ evolveOutcome evolveParamsByGradientDescent(
 			params[i] = fmod(params[i], 2*M_PI);
 	}
 	
+	// update the wavefunction with new params
 	ansatzCircuit(mem, qubits, params, mem->numParams);
 	
 	return SUCCESS;
 }
 
+evolveOutcome evolveParamsByHessian(
+	EvolverMemory *mem, 
+	void (*ansatzCircuit)(EvolverMemory*, MultiQubit, double*, int), 
+	int (*inversionMethod)(EvolverMemory*, gsl_matrix*),
+	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, 
+	int wrapParams, int derivAccuracy, 
+    int shotNoiseNumSamplesHess, int shotNoiseNumSamplesC, double decoherenceFactor) 
+{
+	evolveOutcome outcome = SUCCESS;
+	
+	// compute matrices A and C
+	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+    computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
+    computeHessian(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+	
+	/* EXCITING STATES IN HESSIAN METHOD WILL REQUIRE MODIFYING HESSIAN MATRIX */
+	
+	// add a little noise to C and the hessian matrix
+    addNoiseToHessian(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesHess, decoherenceFactor);
+    addNoiseToVectorC(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesC, decoherenceFactor);
+    
+	// solve -Hessian paramChange = C
+	int singular = inversionMethod(mem, mem->matrHessian); // multiply by -1???
+	if (singular)
+		return FAILED;
 
+	// update params
+	for (int i=0; i < mem->numParams; i++)
+		params[i] += timeStepSize*gsl_vector_get(mem->paramChange, i);
+	
+	// wrap-around params in [0, 2pi] to avoid overflow
+	if (wrapParams) {
+		for (int i=0; i < mem->numParams; i++)
+			params[i] = fmod(params[i], 2*M_PI);
+	}
+	
+	// update the wavefunction with new params
+	ansatzCircuit(mem, qubits, params, mem->numParams);
+	
+	// indicate params updated successfully
+	return outcome;
+}
 
 
 /**
@@ -563,6 +663,7 @@ EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 	memory.permA = gsl_permutation_alloc(memory.numParams);
 	memory.vecC = gsl_vector_alloc(memory.numParams);
 	memory.paramChange = gsl_vector_alloc(memory.numParams);
+    memory.matrHessian = gsl_matrix_alloc(memory.numParams, memory.numParams);
 	
 	// allocate least-squares approx objects
 	memory.matrATA = gsl_matrix_alloc(memory.numParams, memory.numParams);
@@ -650,6 +751,7 @@ void freeEvolverMemory(EvolverMemory *memory) {
 	
 	// free LU-decomp structures
 	gsl_matrix_free(memory->matrA);
+    gsl_matrix_free(memory->matrHessian);
 	gsl_vector_free(memory->vecC);
 	gsl_vector_free(memory->paramChange);
 	gsl_permutation_free(memory->permA);
