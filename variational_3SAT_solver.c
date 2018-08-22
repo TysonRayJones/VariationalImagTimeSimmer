@@ -179,7 +179,7 @@ int main(int narg, char *varg[]) {
     int shotNoiseNumSamplesA;
     int shotNoiseNumSamplesC;
     double decoherenceFactor;
-	int useGradDesc;
+	char* evolverMethodString; //int useGradDesc;
 	char* ansatzCircString;
 	double paramChangeThreshold;
 	int exciteWhenStuck;
@@ -257,12 +257,12 @@ int main(int narg, char *varg[]) {
         scanf("%lf", &decoherenceFactor);
         printf("\n");
 		
-		printf("Enter whether to use imaginary-time evolution (0) or gradient descent (1)\n");
-		printf("use_gd: ");
-		scanf("%d", &useGradDesc);
-		printf("\n");
+		printf("Enter the parameter evolver method to use. This can be one of:\n");
+        printf("imagtime\ngradDesc\nhessian\nadam");
+		printf("evolver_method: ");
+        evolverMethodString = "imagTime";
+        printf("\nUSING DEFAULT imagTime (until I fix this)\n\n");
 		
-		// TODO: get ansatz
 		printf("Enter ansatz circuit\n");
 		printf("ansatz: ");
 		ansatzCircString = "lowDepth";
@@ -314,7 +314,7 @@ int main(int narg, char *varg[]) {
             "shot_noise_num_samples_A\n"
             "shot_noise_num_samples_C\n"
             "decoherence_factor\n"
-			"use_gd[0 or 1]\n"
+			"evolver_method{imagTime,gradDesc,hessian,adam}\n"
 			"ansatz\n"
 			"param_change\n"
 			"excite_when_stuck[0 never, 1 always, 2 only when in excited]\n"
@@ -342,7 +342,7 @@ int main(int narg, char *varg[]) {
         shotNoiseNumSamplesA = atoi(varg[ind++]);
         shotNoiseNumSamplesC = atoi(varg[ind++]);
         sscanf(varg[ind++], "%lf", &decoherenceFactor);
-		useGradDesc = atoi(varg[ind++]);
+        evolverMethodString = varg[ind++]; //useGradDesc = atoi(varg[ind++]);
 		ansatzCircString = varg[ind++];
 		sscanf(varg[ind++], "%lf", &paramChangeThreshold);
 		exciteWhenStuck = atoi(varg[ind++]);
@@ -397,6 +397,8 @@ int main(int narg, char *varg[]) {
 		printf("ERROR! hamil_type must be '3SAT' or 'Chemistry'\n");
 		return 1;
 	}
+    
+    enum ParamEvolver evolverMethod = getParamEvolverFromString(evolverMethodString);
 	
 	// apply (some of the) auto-parameters
 	if (numParams == 0)
@@ -419,7 +421,7 @@ int main(int narg, char *varg[]) {
     printf("shotNoiseNumSamplesA: %d\n", shotNoiseNumSamplesA);
     printf("shotNoiseNumSamplesC: %d\n", shotNoiseNumSamplesC);
     printf("decoherenceFactor: %lf\n", decoherenceFactor);
-	printf("useGradDesc: %d\n", useGradDesc);
+	printf("evolverMethod: %s\n", evolverMethodString);
 	printf("ansatzCircuit: %s\n", ansatzCircString);
 	printf("paramChangeThreshold: %lf\n", paramChangeThreshold);
 	printf("exciteWhenStuck: %d\n", exciteWhenStuck);
@@ -684,8 +686,12 @@ int main(int narg, char *varg[]) {
 	setAnsatzInitState(&mem, qubits);
 	
 	evolveOutcome outcome;
+    double prevEnergy;
 	double energy;
 	
+    // jump back and repeat everything if a repetition had an unstable evolution
+    RESTART_ALL_SIMS:
+    
 	// re-simulate many times
 	for (int rep=0; rep < simRepetitions; rep++) {
 		
@@ -697,22 +703,27 @@ int main(int narg, char *varg[]) {
 		
 		// remove any static states from the Hamiltonian excitations
 		clearExcitedStates(&mem);
+        
+        // clear ADAM moments
+        clearAdamMoments(&mem);
 		
 		// get energy of initial param values
 		ansatz(&mem, qubits, params, numParams);
 		energy = getExpectedEnergy(mem.hamilState, qubits, hamil);
 		expectedEnergyEvo[rep][0] = energy;
 		printf("initial\t<E> = %f\n", energy);
+        
+        prevEnergy = energy;
 		
 		// keep evolving until we converge or reach max iterations
 		for (int step = 0; step < maxIterations; step++) {
 			
 			// update params under parameterised evolution
-			if (useGradDesc)
+			if (evolverMethod == gradDescEvolver)
 				outcome = evolveParamsByGradientDescent(
 					&mem, ansatz, qubits, params, hamil, timeStep, wrapParams, derivAccuracy, 
                     shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
-			else
+			else if (evolverMethod == imagTimeEvolver)
 				outcome = evolveParamsByImaginaryTime(
 					&mem, ansatz, 
 					//approxParamsByTSVD,
@@ -720,19 +731,58 @@ int main(int narg, char *varg[]) {
 					//approxParamsByLUDecomp,
 					qubits, params, hamil, timeStep, wrapParams, derivAccuracy, 
                     shotNoiseNumSamplesA, shotNoiseNumSamplesC, decoherenceFactor);
+            else if (evolverMethod == hessianEvolver)
+				outcome = evolveParamsByHessian(
+					&mem, ansatz, 
+					//approxParamsByTSVD,
+					approxParamsByTikhonov,
+					//approxParamsByLUDecomp,
+					qubits, params, hamil, timeStep, wrapParams, derivAccuracy, 
+                    shotNoiseNumSamplesA,  // uses A shot noise in hessian - no biggie
+                    shotNoiseNumSamplesC, decoherenceFactor);
+            else if (evolverMethod == adamEvolver)
+				outcome = evolveParamsByAdam(
+					&mem, ansatz, qubits, params, hamil, timeStep, wrapParams, derivAccuracy, 
+                    shotNoiseNumSamplesC, decoherenceFactor, step);
+            
 			
 			if (outcome == FAILED) {
 				printf("Numerical inversion failed! Aborting entire sim!\n");
 				return 1;
 			}
 			
-			// evolve wavefunction (non-parameterised) under exact evolution
-			//evolveWavefunction(qubits, hamil, timeStep);
-			
 			// monitor convergence
-			
-			//prob = 0; // getProbEl(qubits, solState);
 			energy = getExpectedEnergy(mem.hamilState, qubits, hamil);
+            
+            /*
+            HACKY SHOT NOISE ADJUSTMENT 
+            */
+            /*
+            if (step >= 100) {
+                printf("REDUCING A SHOT NOISE HACK!\n");
+                shotNoiseNumSamplesA = 100;
+            } else {
+                shotNoiseNumSamplesA = 5;
+            }
+            */
+            
+            
+            /*
+            HACKY ADAPATIVE TIMESTEP
+            */
+            
+            if (step > 0 && step < 10 && energy > prevEnergy) {
+                
+                timeStep *= 0.9;
+                printf("ENERGY INCREASED: %lf to %lf\n", prevEnergy, energy);
+                printf("ADJUSTING TIMESTEP %lf AND RESTARTING\n", timeStep);
+                goto RESTART_ALL_SIMS;
+            }
+            
+            
+                
+            prevEnergy = energy;
+            
 		
 			// print progress
 			if (progressPrintFrequency != 0 && step % progressPrintFrequency == 0) {
@@ -833,7 +883,7 @@ int main(int narg, char *varg[]) {
         writeDoubleToAssoc(file, "decoherenceFactor", decoherenceFactor, 10);
 		writeIntToAssoc(file, "wrapParams", wrapParams);
 		writeDoubleToAssoc(file, "timeStep", timeStep, 10);
-		writeIntToAssoc(file, "useGradDesc", useGradDesc);
+		writeStringToAssoc(file, "evolverMethod", evolverMethodString);
 		writeStringToAssoc(file, "ansatz", ansatzCircString);
 		writeDoubleToAssoc(file, "paramChangeThreshold", paramChangeThreshold, 10);
 		writeIntToAssoc(file, "exciteWhenStuck", exciteWhenStuck);

@@ -22,7 +22,8 @@ extern const double EXCITATION_OF_SAVED_STATES;
 
 
 
-
+enum ParamEvolver {imagTimeEvolver, gradDescEvolver, hessianEvolver, adamEvolver};
+enum ParamEvolver getParamEvolverFromString(char* string);
 
 /**
  * A container for the memory used by evolveParams. Is to be created once
@@ -50,6 +51,8 @@ typedef struct {
 	gsl_matrix *matrA;          // imaginary-time
 	gsl_permutation *permA;
 	gsl_matrix *matrHessian;    // Hessian grad-desc
+    gsl_vector *vecAdamFirstMoment;
+    gsl_vector *vecAdamSecondMoment;
 	
 	// gsl objects for least squares, when A not invertible
 	gsl_matrix *matrATA;
@@ -138,6 +141,18 @@ evolveOutcome evolveParamsByHessian(
 	int wrapParams, int derivAccuracy, 
     int shotNoiseNumSamplesHess, int shotNoiseNumSamplesC, double decoherenceFactor
 );
+    
+evolveOutcome evolveParamsByAdam(
+	EvolverMemory *mem, 
+	void (*ansatzCircuit)(EvolverMemory*, MultiQubit, double*, int), 
+	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, 
+	int wrapParams, int derivAccuracy, 
+    int shotNoiseNumSamplesC, double decoherenceFactor, int iter
+); 
+  
+/** must be done at the start of every new adam simulation */  
+void clearAdamMoments(EvolverMemory *mem);
+
     
     
 /* adds noise */

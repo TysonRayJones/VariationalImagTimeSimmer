@@ -10,6 +10,7 @@
 #include <math.h>
 #include <complex.h>
 #include <stdlib.h>
+#include <string.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_linalg.h>
@@ -28,6 +29,13 @@ const double DERIV_STEP_SIZE = 1E-5; // 1E-8;
 const int MAX_NUM_SAVED_STATES = 1000;
 const double EXCITATION_OF_SAVED_STATES = 10;
 
+
+
+
+// constant parameters for ADAM
+const double ADAM_BETA_1 = 0.1;
+const double ADAM_BETA_2 = 0.1;
+const double ADAM_EPSILON = 0.00000001;
 
 
 /** finite-dif first deriv coefficients of psi(x+nh) for n > 0, or -1*(that for n < 0) */
@@ -180,14 +188,6 @@ void findMixedDeriv(
 	params[paramInd2] = origParam2;  
 }
 
-
-
-
-
-
-
-
-
 /**
  * Returns the real component of the inner product between two complex vectors 
  * (of the given length). Note Re(vec1 . vec2) = Re(vec2 . vec1)
@@ -256,7 +256,7 @@ void computeSecondDerivs(
 }
 
 /** to be called after computeFirstDerivs */
-void computeVectorA(EvolverMemory *mem) 
+void computeMatrixA(EvolverMemory *mem) 
 {	
 	for (int i=0; i < mem->numParams; i++)
 		for (int j=0; j < mem->numParams; j++)
@@ -264,14 +264,13 @@ void computeVectorA(EvolverMemory *mem)
 }
 
 /** to be called after computeFirstDerivs */
-void computeVectorC(
-	EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
-	MultiQubit qubits, double* params, Hamiltonian hamil) 
+void computeVectorC(EvolverMemory *mem)
 {	
 	for (int i=0; i < mem->numParams; i++)
 		gsl_vector_set(mem->vecC, i, -realInnerProduct(mem->firstDerivs[i], mem->hamilState, mem->stateSize));
 }
 
+/** to be called after computeFirstDerivs */
 void computeHessian(EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem, MultiQubit, double*, int),
 	MultiQubit qubits, double* params, Hamiltonian hamil, int accuracy) {
     
@@ -294,8 +293,24 @@ void computeHessian(EvolverMemory *mem, void (*ansatzCircuit)(EvolverMemory *mem
     }
 }
 
-void computeAdamMoments() {
+/** to be called after computeFirstDerivs and computeVectorC */
+void computeAdamMoments(EvolverMemory *mem, int iter)
+{
+    // update the first moment
+    for (int i=0; i < mem->numParams; i++) {
+        double currVal = gsl_vector_get(mem->vecAdamFirstMoment,i);
+        double gradVal = - gsl_vector_get(mem->vecC, i);
+        double newVal = (ADAM_BETA_1*currVal + (1-ADAM_BETA_1)*gradVal)/(1.0-pow(ADAM_BETA_1,iter+1));
+        gsl_vector_set(mem->vecAdamFirstMoment, i, newVal);
+    }
     
+    // update the second moment
+    for (int i=0; i < mem->numParams; i++) {
+        double currVal = gsl_vector_get(mem->vecAdamSecondMoment,i);
+        double gradVal = - gsl_vector_get(mem->vecC, i);
+        double newVal = (ADAM_BETA_2*currVal + (1-ADAM_BETA_2)*gradVal*gradVal)/(1.0-pow(ADAM_BETA_2,iter+1));
+        gsl_vector_set(mem->vecAdamSecondMoment, i, newVal);
+    }
 }
 
 
@@ -319,10 +334,6 @@ void exciteSavedStatesInDerivMatrices(EvolverMemory *mem, MultiQubit qubits) {
 		}
 	}
 }
-
-
-
-
 
 double sampleNormalDistrib(double mean, double var) {
     
@@ -399,6 +410,21 @@ void addNoiseToHessian(
 	}
 }
 
+
+enum ParamEvolver getParamEvolverFromString(char* string) {
+	if (strcmp(string, "imagTime") == 0)
+        return imagTimeEvolver;
+	if (strcmp(string, "gradDesc") == 0)
+        return gradDescEvolver;
+    if (strcmp(string, "hessian") == 0)
+        return hessianEvolver;
+    if (strcmp(string, "adam") == 0)
+        return adamEvolver;
+    
+    printf("\nERROR: invalid paramEvolver '%s'. Exiting...\n", string);
+    exit(1);
+}
+
 /**
  * Given a list of parameters, a parameterised wavefunction (through ansatzCircuit) and
  * a diagonal Hamiltonian, modifies the parameters by a single time-step under imaginary time 
@@ -444,8 +470,8 @@ evolveOutcome evolveParamsByImaginaryTime(
 	
 	// compute matrices A and C
 	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
-    computeVectorA(mem);
-    computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
+    computeMatrixA(mem);
+    computeVectorC(mem);
 	
 	// morph C to excite Hamiltonain states
 	exciteSavedStatesInDerivMatrices(mem, qubits);
@@ -490,7 +516,7 @@ evolveOutcome evolveParamsByGradientDescent(
 {
 	// compute vector C
 	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
-    computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
+    computeVectorC(mem);
 	
 	// morph C to excite Hamiltonain states
 	exciteSavedStatesInDerivMatrices(mem, qubits);
@@ -524,9 +550,9 @@ evolveOutcome evolveParamsByHessian(
 {
 	evolveOutcome outcome = SUCCESS;
 	
-	// compute matrices A and C
+	// compute matrices Hessian and C
 	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
-    computeVectorC(mem, ansatzCircuit, qubits, params, hamil);
+    computeVectorC(mem);
     computeHessian(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
 	
 	/* EXCITING STATES IN HESSIAN METHOD WILL REQUIRE MODIFYING HESSIAN MATRIX */
@@ -556,6 +582,55 @@ evolveOutcome evolveParamsByHessian(
 	// indicate params updated successfully
 	return outcome;
 }
+
+evolveOutcome evolveParamsByAdam(
+	EvolverMemory *mem, 
+	void (*ansatzCircuit)(EvolverMemory*, MultiQubit, double*, int), 
+	MultiQubit qubits, double* params, Hamiltonian hamil, double timeStepSize, 
+	int wrapParams, int derivAccuracy, 
+    int shotNoiseNumSamplesC, double decoherenceFactor, int iter) 
+{
+	evolveOutcome outcome = SUCCESS;
+	
+	// compute C matrix
+	computeFirstDerivs(mem, ansatzCircuit, qubits, params, hamil, derivAccuracy);
+    computeVectorC(mem);
+    
+	// morph C to excite Hamiltonain states
+	exciteSavedStatesInDerivMatrices(mem, qubits);
+    
+    // add noise to the measuring of C
+    addNoiseToVectorC(mem, hamil.termCoeffSquaredSum, shotNoiseNumSamplesC, decoherenceFactor);
+    
+    // compute adam moments
+    computeAdamMoments(mem, iter);
+	
+    // update params under adam moment
+	for (int i=0; i < mem->numParams; i++) {
+        double mVal = gsl_vector_get(mem->vecAdamFirstMoment, i);
+        double vVal = gsl_vector_get(mem->vecAdamSecondMoment, i);
+        
+	    params[i] -= timeStepSize * mVal / (sqrt(vVal) + ADAM_EPSILON);
+	}
+	
+	// wrap-around params in [0, 2pi] to avoid overflow
+	if (wrapParams) {
+		for (int i=0; i < mem->numParams; i++)
+			params[i] = fmod(params[i], 2*M_PI);
+	}
+	
+	// update the wavefunction with new params
+	ansatzCircuit(mem, qubits, params, mem->numParams);
+	
+	// indicate params updated successfully
+	return outcome;
+    
+}
+
+
+
+
+
 
 
 /**
@@ -664,6 +739,8 @@ EvolverMemory prepareEvolverMemory(MultiQubit qubits, int numParams) {
 	memory.vecC = gsl_vector_alloc(memory.numParams);
 	memory.paramChange = gsl_vector_alloc(memory.numParams);
     memory.matrHessian = gsl_matrix_alloc(memory.numParams, memory.numParams);
+    memory.vecAdamFirstMoment = gsl_vector_calloc(memory.numParams);
+    memory.vecAdamSecondMoment = gsl_vector_calloc(memory.numParams);
 	
 	// allocate least-squares approx objects
 	memory.matrATA = gsl_matrix_alloc(memory.numParams, memory.numParams);
@@ -755,6 +832,8 @@ void freeEvolverMemory(EvolverMemory *memory) {
 	gsl_vector_free(memory->vecC);
 	gsl_vector_free(memory->paramChange);
 	gsl_permutation_free(memory->permA);
+    gsl_vector_free(memory->vecAdamFirstMoment);
+    gsl_vector_free(memory->vecAdamSecondMoment);
 	
 	// free least-squares structures
 	gsl_matrix_free(memory->matrATA);
@@ -777,6 +856,14 @@ void freeEvolverMemory(EvolverMemory *memory) {
 	gsl_vector_free(memory->tikhonovVecL);
 }
 
+// adam moments must be set to 0 at the start of each simulation
+void clearAdamMoments(EvolverMemory *mem) {
+    
+    for (int i=0; i < mem->numParams; i++) {
+        gsl_vector_set(mem->vecAdamFirstMoment, i, 0);
+        gsl_vector_set(mem->vecAdamSecondMoment, i, 0);
+    }
+}
 
 
 
