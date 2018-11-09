@@ -1,3 +1,12 @@
+THIS CODE IS GROSS
+===================
+
+View a much more user-friendly yet more powerful library [here](https://github.com/TysonRayJones/DissipativeRecompiler):
+
+
+
+
+
 > The below instructions are out of date, since the interface has become more flexible.
 > See [hamiltonian_builder.h](hamiltonian_builder.h) for creating a Hamiltonian, and see the 
 > ```C
