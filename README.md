@@ -1,7 +1,7 @@
 THIS CODE IS GROSS
 ===================
 
-View a much more user-friendly yet more powerful library [here](https://github.com/TysonRayJones/DissipativeRecompiler):
+View a much more user-friendly yet more powerful library [here](https://github.com/QTechTheory/DissipativeRecompiler):
 
 
 
