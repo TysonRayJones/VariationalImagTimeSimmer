@@ -1,10 +1,9 @@
 THIS CODE IS GROSS
 ===================
 
-View a much more user-friendly yet more powerful library [here](https://github.com/QTechTheory/DissipativeRecompiler):
+View a much more user-friendly yet more powerful library [here](https://github.com/QTechTheory/DissipativeRecompiler).
 
-
-
+Note also the Hessian method used here is incorrect; see [utilities.c](https://github.com/TysonRayJones/TinyImagTime/blob/master/utilities.c) in [this shorter repo](https://github.com/TysonRayJones/TinyImagTime) for a correct implementation.
 
 
 > The below instructions are out of date, since the interface has become more flexible.
